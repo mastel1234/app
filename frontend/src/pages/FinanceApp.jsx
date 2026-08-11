@@ -2,6 +2,7 @@ import { useState } from 'react';
 import { Wallet, LayoutDashboard, ArrowRightLeft, Tags, Target, Settings2 } from 'lucide-react';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { useFinance } from '@/hooks/useFinance';
+import { useBudgetNotifications } from '@/hooks/useBudgetNotifications';
 import Dashboard from '@/components/finance/Dashboard';
 import Transactions from '@/components/finance/Transactions';
 import Categories from '@/components/finance/Categories';
@@ -15,6 +16,7 @@ export default function FinanceApp() {
   const finance = useFinance();
   const [tab, setTab] = useState('dashboard');
   const currentCurrency = CURRENCIES.find((c) => c.code === finance.data.currency) || CURRENCIES[0];
+  useBudgetNotifications(finance);
 
   return (
     <div className="min-h-screen bg-background" data-testid="finance-app">

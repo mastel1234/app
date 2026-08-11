@@ -1,6 +1,6 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { Plus, ArrowUpCircle, ArrowDownCircle, X } from 'lucide-react';
+import { Plus, ArrowUpCircle, ArrowDownCircle, X, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
@@ -14,7 +14,7 @@ function todayStr() {
 
 export default function QuickAddFAB({ finance }) {
   const [menuOpen, setMenuOpen] = useState(false);
-  const [dialogType, setDialogType] = useState(null); // 'expense' | 'income'
+  const [dialogType, setDialogType] = useState(null); // 'expense' | 'income' | 'frequent'
   const [amount, setAmount] = useState('');
   const [categoryId, setCategoryId] = useState('');
   const [source, setSource] = useState('');
@@ -23,6 +23,8 @@ export default function QuickAddFAB({ finance }) {
   const currency = finance.data.currency;
   const categories = finance.monthly.byCategory;
   const selectedCat = categories.find((c) => c.id === categoryId);
+  const frequents = finance.data.frequents || [];
+  const catMap = Object.fromEntries(finance.data.categories.map((c) => [c.id, c]));
 
   const openDialog = (type) => {
     setDialogType(type);
@@ -34,6 +36,20 @@ export default function QuickAddFAB({ finance }) {
   };
 
   const close = () => setDialogType(null);
+
+  const applyFrequent = (f) => {
+    const cat = catMap[f.categoryId];
+    finance.applyFrequent(f);
+    if (cat && cat.monthlyLimit > 0) {
+      const spent = finance.monthly.expenses.filter((e) => e.categoryId === cat.id).reduce((s, e) => s + Number(e.amount), 0);
+      const rem = cat.monthlyLimit - (spent + Number(f.amount));
+      if (rem < 0) toast.error(`Excedido "${cat.name}" por ${formatMoney(-rem, currency)}`);
+      else toast.success(`Registrado. Disponible en "${cat.name}": ${formatMoney(rem, currency)}`);
+    } else {
+      toast.success('Registrado');
+    }
+    close();
+  };
 
   const submit = () => {
     const amt = parseFloat(amount);
@@ -72,6 +88,16 @@ export default function QuickAddFAB({ finance }) {
       <div className="fixed bottom-6 right-4 sm:right-6 z-50 flex flex-col items-end gap-3" data-testid="fab-container">
         {menuOpen && (
           <div className="flex flex-col gap-2 stagger-in">
+            {frequents.length > 0 && (
+              <button
+                onClick={() => openDialog('frequent')}
+                className="flex items-center gap-2 bg-card border border-border rounded-full pl-4 pr-5 py-2.5 shadow-lg hover:-translate-y-0.5 transition-transform"
+                data-testid="fab-frequent-btn"
+              >
+                <Zap className="w-5 h-5 text-[hsl(var(--warning))]" />
+                <span className="text-sm font-semibold">Frecuente</span>
+              </button>
+            )}
             <button
               onClick={() => openDialog('income')}
               className="flex items-center gap-2 bg-card border border-border rounded-full pl-4 pr-5 py-2.5 shadow-lg hover:-translate-y-0.5 transition-transform"
@@ -103,13 +129,50 @@ export default function QuickAddFAB({ finance }) {
       <Dialog open={dialogType !== null} onOpenChange={(o) => !o && close()}>
         <DialogContent data-testid="quick-add-dialog">
           <DialogHeader>
-            <DialogTitle>{dialogType === 'expense' ? 'Registrar Gasto' : 'Registrar Ingreso'}</DialogTitle>
+            <DialogTitle>
+              {dialogType === 'expense' && 'Registrar Gasto'}
+              {dialogType === 'income' && 'Registrar Ingreso'}
+              {dialogType === 'frequent' && 'Gastos Frecuentes'}
+            </DialogTitle>
             <DialogDescription>
-              {dialogType === 'expense'
-                ? 'Se descontará automáticamente del límite de la categoría elegida.'
-                : 'Se sumará al total de ingresos del mes.'}
+              {dialogType === 'expense' && 'Se descontará automáticamente del límite de la categoría elegida.'}
+              {dialogType === 'income' && 'Se sumará al total de ingresos del mes.'}
+              {dialogType === 'frequent' && 'Toca uno para registrarlo con la fecha de hoy.'}
             </DialogDescription>
           </DialogHeader>
+
+          {dialogType === 'frequent' ? (
+            <div className="space-y-2 max-h-[60vh] overflow-y-auto" data-testid="fab-frequent-list">
+              {frequents.length === 0 ? (
+                <p className="text-sm text-muted-foreground py-6 text-center">
+                  No tienes gastos frecuentes. Créalos en la pestaña "Movimientos".
+                </p>
+              ) : (
+                frequents.map((f) => {
+                  const cat = catMap[f.categoryId];
+                  return (
+                    <button
+                      key={f.id}
+                      onClick={() => applyFrequent(f)}
+                      className="w-full text-left rounded-md border border-border bg-secondary/40 p-3 hover:-translate-y-0.5 hover:shadow-md transition-transform"
+                      data-testid={`fab-frequent-${f.id}`}
+                    >
+                      <div className="flex items-center justify-between gap-3">
+                        <div className="min-w-0">
+                          <div className="flex items-center gap-2 mb-0.5">
+                            {cat && <span className="w-2.5 h-2.5 rounded-full shrink-0" style={{ backgroundColor: cat.color }} />}
+                            <span className="font-semibold text-sm truncate">{f.name}</span>
+                          </div>
+                          <span className="text-xs text-muted-foreground">{cat?.name || 'Sin categoría'}</span>
+                        </div>
+                        <span className="text-lg font-display font-bold tabular-nums shrink-0">{formatMoney(f.amount, currency)}</span>
+                      </div>
+                    </button>
+                  );
+                })
+              )}
+            </div>
+          ) : (
           <div className="space-y-4">
             <div>
               <Label htmlFor="fab-amount">Monto ({currency})</Label>
@@ -191,9 +254,12 @@ export default function QuickAddFAB({ finance }) {
               <Input id="fab-note" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Describe brevemente…" data-testid="fab-note-input" />
             </div>
           </div>
+          )}
           <DialogFooter>
             <Button variant="outline" onClick={close}>Cancelar</Button>
-            <Button onClick={submit} data-testid="fab-submit-btn">Guardar</Button>
+            {dialogType !== 'frequent' && (
+              <Button onClick={submit} data-testid="fab-submit-btn">Guardar</Button>
+            )}
           </DialogFooter>
         </DialogContent>
       </Dialog>

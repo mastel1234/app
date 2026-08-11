@@ -1,0 +1,68 @@
+{
+  "summary": "Frontend-only mobile E2E review of frequent expenses and budget notifications. All requested notification flows and frequent create/apply/FAB/delete/persistence flows passed. Four defects were reproduced: persisted frequent edit dialogs open blank, mobile edit/delete controls are visually hidden, non-positive frequent amounts are accepted and applied, and deleting a category leaves orphan frequent templates.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "FrequentDialog",
+        "issue": "After reload, tapping Edit opens the dialog with blank name, amount, and category instead of the saved values. Editing only succeeds if the user re-enters every required field.",
+        "selector": "[data-testid^='edit-frequent-'], [data-testid='frequent-name-input'], [data-testid='frequent-amount-input'], [data-testid='frequent-category-select']",
+        "priority": "HIGH"
+      },
+      {
+        "component": "FrequentExpenses mobile card actions",
+        "issue": "Edit and delete controls have computed opacity 0 at 390x844 and only become visible through group-hover, leaving touch users without a visible affordance.",
+        "selector": "[data-testid^='edit-frequent-'], [data-testid^='delete-frequent-']",
+        "priority": "HIGH"
+      }
+    ],
+    "integration_issues": [
+      {
+        "flow": "Frequent amount validation and apply",
+        "issue": "The frequent form accepts amount -5, persists it, and applying it creates a negative expense that increases category availability from RD$1,000 to RD$1,005.",
+        "affected_selectors": ["[data-testid='frequent-amount-input']", "[data-testid='frequent-save-btn']", "[data-testid^='frequent-item-']"]
+      },
+      {
+        "flow": "Category deletion with saved frequent",
+        "issue": "Deleting a category removes its expenses but leaves frequent templates referencing the deleted category; the template remains actionable and displays 'Sin categoría'.",
+        "affected_selectors": ["[data-testid^='delete-cat-']", "[data-testid^='frequent-item-']"]
+      }
+    ],
+    "design_issues": [
+      {
+        "screen": "Movimientos / Gastos Frecuentes on mobile",
+        "issues": [
+          "Edit/delete actions depend on hover and are invisible on a touch-first 390x844 viewport."
+        ]
+      }
+    ]
+  },
+  "test_report_links": [],
+  "action_items": [
+    "Synchronize FrequentDialog form state whenever a different frequent is selected/opened.",
+    "Keep edit/delete actions visible on touch/mobile and provide accessible labels.",
+    "Reject frequent amounts that are not finite numbers greater than zero in create and update flows.",
+    "Define and implement category deletion behavior for related frequents (cascade, block, or require reassignment)."
+  ],
+  "critical_code_review_comments": [
+    "FrequentDialog initializes useState from initial only on first mount; because the dialog component remains mounted while initial changes from null to a saved frequent, persisted edits open blank. Reset form state from initial when open/initial changes or remount with a stable key.",
+    "FrequentExpenses.submit checks only whether the amount string is non-empty; parseFloat('-5') is accepted. Validate Number.isFinite(value) && value > 0 before saving.",
+    "deleteCategory filters categories and expenses but not frequents, creating dangling categoryId references.",
+    "The frequent card uses a clickable div without keyboard role/tabIndex, while its nested edit/delete icon buttons have no aria-label; this makes the quick-apply/edit/delete flow inaccessible to keyboard and assistive-technology users."
+  ],
+  "updated_files": [
+    "/app/test_reports/iteration_3.json"
+  ],
+  "success_rate": {
+    "backend": "not tested (skipped per request)",
+    "frontend": "88%"
+  },
+  "seed_data_creation": "Created isolated localStorage fixtures and UI-created category/frequent/expense data under finance_tracker_data_v1; no backend or production data was modified.",
+  "should_call_test_agent_after_fix": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Retest mobile frequent edit after a full reload, touch visibility of card actions, rejection of zero/negative values, and category deletion cleanup. Notification permission toggle and 80%/100% duplicate-prevention logic passed with a mocked Notification constructor; notifiedThresholds persisted as [80,100].",
+  "rca_of_the_issue": "Edit prefill fails because React state is initialized from props only once. Mobile action visibility is hover-only CSS. Negative values pass the non-empty-string guard. Category deletion does not update the new frequents collection."
+}

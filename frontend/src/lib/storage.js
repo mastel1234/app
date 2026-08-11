@@ -6,6 +6,9 @@ const defaultData = {
   expenses: [], // { id, amount, categoryId, date, note }
   categories: [], // { id, name, color, monthlyLimit }
   goals: [], // { id, name, targetAmount, currentAmount, month (YYYY-MM), note }
+  frequents: [], // { id, name, amount, categoryId, note }
+  notificationsEnabled: false,
+  notifiedThresholds: {}, // { "YYYY-MM_categoryId": [80, 100] }
 };
 
 export function loadData() {

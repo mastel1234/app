@@ -45,6 +45,7 @@ export function useFinance() {
       ...d,
       categories: d.categories.filter((c) => c.id !== id),
       expenses: d.expenses.filter((e) => e.categoryId !== id),
+      frequents: (d.frequents || []).filter((f) => f.categoryId !== id),
     }));
   }, []);
 
@@ -77,10 +78,49 @@ export function useFinance() {
   }, []);
 
   const resetAll = useCallback(() => {
-    setData({ currency: data.currency, incomes: [], expenses: [], categories: [], goals: [] });
+    setData({ currency: data.currency, incomes: [], expenses: [], categories: [], goals: [], frequents: [], notificationsEnabled: false, notifiedThresholds: {} });
   }, [data.currency]);
 
   const importAll = useCallback((next) => setData(next), []);
+
+  const addFrequent = useCallback((freq) => {
+    setData((d) => ({ ...d, frequents: [...(d.frequents || []), { id: uid(), ...freq }] }));
+  }, []);
+
+  const updateFrequent = useCallback((id, updates) => {
+    setData((d) => ({ ...d, frequents: (d.frequents || []).map((f) => (f.id === id ? { ...f, ...updates } : f)) }));
+  }, []);
+
+  const deleteFrequent = useCallback((id) => {
+    setData((d) => ({ ...d, frequents: (d.frequents || []).filter((f) => f.id !== id) }));
+  }, []);
+
+  const applyFrequent = useCallback((freq) => {
+    const today = new Date().toISOString().slice(0, 10);
+    setData((d) => ({
+      ...d,
+      expenses: [
+        ...d.expenses,
+        { id: uid(), amount: Number(freq.amount), categoryId: freq.categoryId, date: today, note: freq.note || freq.name },
+      ],
+    }));
+  }, []);
+
+  const setNotificationsEnabled = useCallback((enabled) => {
+    setData((d) => ({ ...d, notificationsEnabled: enabled }));
+  }, []);
+
+  const markThresholdNotified = useCallback((month, categoryId, threshold) => {
+    setData((d) => {
+      const key = `${month}_${categoryId}`;
+      const current = (d.notifiedThresholds && d.notifiedThresholds[key]) || [];
+      if (current.includes(threshold)) return d;
+      return {
+        ...d,
+        notifiedThresholds: { ...(d.notifiedThresholds || {}), [key]: [...current, threshold] },
+      };
+    });
+  }, []);
 
   const monthly = useMemo(() => {
     const incomes = data.incomes.filter((i) => monthKey(i.date) === selectedMonth);
@@ -128,5 +168,11 @@ export function useFinance() {
     deleteGoal,
     resetAll,
     importAll,
+    addFrequent,
+    updateFrequent,
+    deleteFrequent,
+    applyFrequent,
+    setNotificationsEnabled,
+    markThresholdNotified,
   };
 }

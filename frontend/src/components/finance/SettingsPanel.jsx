@@ -1,16 +1,39 @@
-import { useRef } from 'react';
+import { useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { Download, FileText, Upload, RotateCcw } from 'lucide-react';
+import { Download, FileText, Upload, RotateCcw, Bell, BellOff } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
+import { Switch } from '@/components/ui/switch';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { CURRENCIES } from '@/lib/currency';
 import { exportCSV, exportPDF } from '@/lib/exportData';
 import { exportJSON, importJSON } from '@/lib/storage';
+import { isNotificationSupported, requestNotificationPermission } from '@/hooks/useBudgetNotifications';
 
 export default function SettingsPanel({ finance }) {
   const fileRef = useRef(null);
+  const [permission, setPermission] = useState(isNotificationSupported() ? Notification.permission : 'unsupported');
+
+  const toggleNotifications = async (checked) => {
+    if (checked) {
+      if (!isNotificationSupported()) {
+        toast.error('Tu navegador no soporta notificaciones');
+        return;
+      }
+      const res = await requestNotificationPermission();
+      setPermission(res);
+      if (res === 'granted') {
+        finance.setNotificationsEnabled(true);
+        toast.success('Notificaciones activadas. Te avisaremos al 80% y 100% del límite.');
+      } else if (res === 'denied') {
+        toast.error('Permiso denegado. Actívalo en la configuración del navegador.');
+      }
+    } else {
+      finance.setNotificationsEnabled(false);
+      toast.success('Notificaciones desactivadas');
+    }
+  };
 
   const handleCSV = () => {
     exportCSV({
@@ -80,6 +103,44 @@ export default function SettingsPanel({ finance }) {
         <h2 className="text-2xl font-display font-bold">Ajustes</h2>
         <p className="text-sm text-muted-foreground">Configura la moneda y gestiona tus datos.</p>
       </div>
+
+      <Card className="shadow-sm">
+        <CardHeader>
+          <CardTitle className="text-lg font-display flex items-center gap-2">
+            {finance.data.notificationsEnabled && permission === 'granted' ? <Bell className="w-4 h-4" /> : <BellOff className="w-4 h-4" />}
+            Notificaciones
+          </CardTitle>
+          <CardDescription>Recibe alertas cuando una categoría llegue al 80% o 100% de su límite.</CardDescription>
+        </CardHeader>
+        <CardContent>
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <Label htmlFor="notif-toggle" className="text-base font-medium">Activar alertas</Label>
+              <p className="text-xs text-muted-foreground mt-1">
+                Estado: <span className="font-semibold">
+                  {permission === 'granted' && finance.data.notificationsEnabled && 'Activas'}
+                  {permission === 'granted' && !finance.data.notificationsEnabled && 'Desactivadas'}
+                  {permission === 'denied' && 'Bloqueadas por el navegador'}
+                  {permission === 'default' && 'Sin permiso otorgado'}
+                  {permission === 'unsupported' && 'No soportado en este navegador'}
+                </span>
+              </p>
+            </div>
+            <Switch
+              id="notif-toggle"
+              checked={finance.data.notificationsEnabled && permission === 'granted'}
+              onCheckedChange={toggleNotifications}
+              disabled={permission === 'unsupported'}
+              data-testid="notifications-toggle"
+            />
+          </div>
+          {permission === 'denied' && (
+            <p className="text-xs text-destructive mt-3">
+              Activa los permisos de notificación en tu navegador (icono de candado junto a la URL) y recarga.
+            </p>
+          )}
+        </CardContent>
+      </Card>
 
       <Card className="shadow-sm">
         <CardHeader>
