@@ -1,5 +1,8 @@
 import { useEffect, useRef } from 'react';
 
+const IS_DEV = typeof process !== 'undefined' && process.env && process.env.NODE_ENV !== 'production';
+const logWarn = (...args) => { if (IS_DEV) console.warn(...args); };
+
 export function isNotificationSupported() {
   return typeof window !== 'undefined' && 'Notification' in window;
 }
@@ -21,18 +24,18 @@ export function showNotification(title, options = {}) {
       navigator.serviceWorker.ready
         .then((reg) => reg.showNotification(title, { icon: '/icon-192.png', badge: '/icon-192.png', ...options }))
         .catch((err) => {
-          console.warn('SW showNotification failed, falling back to Notification()', err);
+          logWarn('SW showNotification failed, falling back to Notification()', err);
           try {
             new Notification(title, { icon: '/icon-192.png', ...options });
           } catch (fallbackErr) {
-            console.warn('Fallback Notification() failed', fallbackErr);
+            logWarn('Fallback Notification() failed', fallbackErr);
           }
         });
     } else {
       new Notification(title, { icon: '/icon-192.png', ...options });
     }
   } catch (err) {
-    console.warn('showNotification failed', err);
+    logWarn('showNotification failed', err);
   }
 }
 
