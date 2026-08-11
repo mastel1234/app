@@ -1,5 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { Wallet, LayoutDashboard, ArrowRightLeft, Tags, Target, Settings2 } from 'lucide-react';
+import { toast } from 'sonner';
 import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { useFinance } from '@/hooks/useFinance';
 import { useBudgetNotifications } from '@/hooks/useBudgetNotifications';
@@ -17,6 +18,21 @@ export default function FinanceApp() {
   const [tab, setTab] = useState('dashboard');
   const currentCurrency = CURRENCIES.find((c) => c.code === finance.data.currency) || CURRENCIES[0];
   useBudgetNotifications(finance);
+
+  // Auto-apply pending recurring transactions on load
+  const didRunRecurring = useRef(false);
+  useEffect(() => {
+    if (didRunRecurring.current) return;
+    if (!finance.data.recurring) return;
+    didRunRecurring.current = true;
+    const count = finance.applyPendingRecurring();
+    if (count > 0) {
+      // Defer toast to next tick so Sonner Toaster is fully subscribed
+      setTimeout(() => {
+        toast.success(`Se aplicaron ${count} transacción(es) recurrente(s) de este mes.`);
+      }, 0);
+    }
+  }, [finance]);
 
   return (
     <div className="min-h-screen bg-background" data-testid="finance-app">
@@ -86,7 +102,7 @@ export default function FinanceApp() {
         </Tabs>
       </main>
 
-      <footer className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-28 sm:pb-6 text-center text-xs text-muted-foreground">
+      <footer className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-40 sm:pb-6 text-center text-xs text-muted-foreground">
         Datos guardados de forma local en tu dispositivo · No se comparten con nadie
       </footer>
 

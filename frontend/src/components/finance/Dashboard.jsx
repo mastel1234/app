@@ -5,6 +5,7 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
 import { BarChart, Bar, XAxis, YAxis, Tooltip, ResponsiveContainer, PieChart, Pie, Cell, Legend, CartesianGrid } from 'recharts';
 import { formatMoney } from '@/lib/currency';
+import MonthlyComparison from '@/components/finance/MonthlyComparison';
 
 function KpiCard({ label, value, icon: Icon, tone = 'default', testId }) {
   const tones = {
@@ -153,6 +154,8 @@ export default function Dashboard({ finance, onGoToCategories }) {
           })}
         </CardContent>
       </Card>
+
+      <MonthlyComparison finance={finance} />
     </div>
   );
 }

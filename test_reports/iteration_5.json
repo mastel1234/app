@@ -1,0 +1,62 @@
+{
+  "summary": "Frontend-only E2E and code review completed for Monthly Comparison and Recurring Transactions on the public URL at mobile 390x844 and desktop 1920x1080. Comparison values/chart/color logic and recurring CRUD, validation, persistence, auto-apply data mutation, idempotency, active state, expense category requirement, and category cascade passed. Two user-facing defects were reproduced: auto-apply never shows its required success toast, and the fixed FAB can overlap the recurring Delete target on mobile.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "RecurringTransactions / QuickAddFAB mobile interaction",
+        "issue": "At 390x844, when the recurring item is scrolled into view near the bottom, the fixed FAB overlays the center of its Delete button. elementFromPoint at the Delete center resolves to fab-toggle; tapping there opens the FAB menu instead of the delete confirmation. The recurring row also measured 311px scrollWidth in a 306px clientWidth.",
+        "selector": "[data-testid='fab-toggle'], [data-testid^='delete-recurring-']",
+        "priority": "HIGH"
+      }
+    ],
+    "integration_issues": [
+      {
+        "flow": "Recurring auto-apply on page load",
+        "issue": "The pending recurring income is created and lastAppliedMonth is persisted, but the required 'Se aplicaron 1 transacción(es) recurrente(s) de este mes.' toast never appears. Reproduced twice with dayOfMonth=1 and lastAppliedMonth=null.",
+        "affected_selectors": ["[data-testid='finance-app']"]
+      }
+    ],
+    "design_issues": [
+      {
+        "screen": "Mobile Movimientos / Transacciones Recurrentes",
+        "issues": [
+          "The fixed FAB can cover a recurring row action at reachable scroll positions; the row has a small 5px internal horizontal overflow."
+        ]
+      },
+      {
+        "screen": "Category deletion confirmation",
+        "issues": [
+          "The prompt says associated expenses will be deleted but does not disclose that linked recurring expense schedules are also permanently removed by the new cascade."
+        ]
+      }
+    ]
+  },
+  "test_report_links": [],
+  "action_items": [
+    "Refactor applyPendingRecurring so its applied count is computed synchronously/purely before the state update (or expose a post-update result), allowing FinanceApp to show the required success toast.",
+    "Prevent QuickAddFAB from covering recurring action buttons on mobile, for example with sufficient content safe-area spacing or collision-aware placement; eliminate the recurring-row internal overflow.",
+    "Update the category deletion confirmation to explicitly mention deletion of linked recurring expense schedules."
+  ],
+  "critical_code_review_comments": [
+    "useFinance.applyPendingRecurring mutates appliedCount inside a setData functional updater and immediately returns it. React executes the queued updater after the callback has returned, so FinanceApp receives 0 even though data is later applied; this is the root cause of the missing toast.",
+    "The applyPendingRecurring state updater is impure: it mutates an outer variable and generates random IDs. React Strict Mode may invoke updater functions more than once, so eligibility/count/ID generation should be moved into a pure deterministic calculation.",
+    "QuickAddFAB uses fixed bottom-6 z-50 positioning without preventing collision with page controls. At the reproduced scroll position, its hit area wins over the recurring Delete button.",
+    "Categories.handleDelete has stale confirmation copy after adding the recurring cascade and does not warn users that a recurring schedule will be deleted."
+  ],
+  "updated_files": [
+    "/app/test_reports/iteration_5.json"
+  ],
+  "success_rate": {
+    "backend": "not tested (skipped per request)",
+    "frontend": "91%"
+  },
+  "seed_data_creation": "Used isolated localStorage fixtures under finance_tracker_data_v1 for Jan/Feb 2026 comparison data, recurring income/expense schedules, active/idempotency states, and cascade testing. UI-created recurring records were deleted during the flows; no backend/shared data was modified.",
+  "should_call_test_agent_after_fix": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Retest the auto-apply toast with dayOfMonth=1 and lastAppliedMonth=null, then reload to confirm exactly one transaction and no second toast. At 390x844, place a recurring item around y=733-795: previously Delete center (x=339,y=764) hit fab-toggle and opened the FAB menu. All comparison assertions passed: Jan 30000/2000 vs Feb 32000/2500 produced +6.7%, +25.0%, +5.4%, six chart bars, and correct inverted expense colors. Recurring create/edit/delete/toggle/validation/category cascade and desktop rendering passed.",
+  "rca_of_the_issue": "Missing toast: applyPendingRecurring returns appliedCount before React runs the setData updater that increments it, so FinanceApp sees zero and skips toast.success. Mobile obstruction: the z-50 fixed FAB overlaps a visible recurring Delete hit target at certain scroll offsets; a center tap is routed to fab-toggle."
+}

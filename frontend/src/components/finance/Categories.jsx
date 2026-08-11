@@ -90,7 +90,7 @@ export default function Categories({ finance }) {
   };
 
   const handleDelete = (id) => {
-    if (window.confirm('¿Eliminar esta categoría? También se eliminarán sus gastos asociados.')) {
+    if (window.confirm('¿Eliminar esta categoría? También se eliminarán sus gastos, gastos frecuentes y transacciones recurrentes asociadas.')) {
       finance.deleteCategory(id);
       toast.success('Categoría eliminada');
     }

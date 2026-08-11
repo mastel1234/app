@@ -1,0 +1,54 @@
+{
+  "summary": "Frontend-only retest completed on the public URL. FIX #3 passed, and the monthly comparison, recurring CRUD/toggle, frequent expense CRUD/apply, category cascade, and notification toggle regressions passed. FIX #1 and FIX #2 remain unresolved: recurring data is applied idempotently but its mount toast is still never rendered, and a physical mobile tap on a recurring Delete target can still be captured by the fixed FAB. Mobile footer pb-40 and recurring-row overflow corrections were verified.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "RecurringTransactions / QuickAddFAB mobile interaction",
+        "issue": "At 390x844, a recurring Delete center positioned at (322,778) resolves to fab-toggle. A physical page.mouse tap opens the FAB Income/Gasto menu and does not open the recurring confirmation. Footer padding is correctly 160px and rows no longer overflow, but those changes do not prevent a fixed z-50 FAB from covering mid-document controls at reachable scroll offsets.",
+        "selector": "[data-testid='fab-toggle'], [data-testid^='delete-recurring-']",
+        "priority": "HIGH"
+      }
+    ],
+    "integration_issues": [
+      {
+        "flow": "Recurring auto-apply on initial page load",
+        "issue": "With one eligible Sueldo recurring income, the income is added once, its note contains 'Recurrente', and lastAppliedMonth is persisted, but zero Sonner toasts matching 'Se aplicaron 1 transacción(es) recurrente(s) de este mes.' are emitted/rendered. The second reload correctly creates neither a toast nor a duplicate income. Reproduced three times, including with a pre-navigation MutationObserver capturing transient Sonner toasts.",
+        "affected_selectors": ["[data-sonner-toast]", "[data-testid='finance-app']"]
+      }
+    ],
+    "design_issues": [
+      {
+        "screen": "Mobile Movimientos / Transacciones Recurrentes",
+        "issues": [
+          "The fixed FAB still has an overlapping hit area over a recurring Delete control at reachable scroll positions, despite the new footer safe-area padding."
+        ]
+      }
+    ]
+  },
+  "test_report_links": [],
+  "action_items": [
+    "Ensure the recurring auto-apply success toast is dispatched only after Sonner Toaster has mounted/subscribed; moving Toaster before route content or deferring the mount-time toast are possible approaches.",
+    "Prevent the fixed mobile FAB hit area from covering underlying controls at any scroll position; footer bottom padding alone cannot protect recurring rows located earlier in the document.",
+    "Retest both defects with a physical coordinate tap and a mount-time toast observer after fixes."
+  ],
+  "critical_code_review_comments": [
+    "App renders <Toaster> after <Routes>. FinanceApp emits the recurring toast from a child mount effect, which can run before Sonner's later sibling subscribes; the synchronous count fix now mutates data correctly but the mount-time toast is still lost. Establish Toaster before toast-producing child effects or delay dispatch until it is ready.",
+    "QuickAddFAB remains fixed bottom-6/right-4 at z-50. Increasing footer padding and compacting rows fixes bottom clearance/overflow but does not prevent overlap with controls in the middle of the scrollable document; event hit-testing still favors fab-toggle."
+  ],
+  "updated_files": [
+    "/app/test_reports/iteration_6.json"
+  ],
+  "success_rate": {
+    "backend": "not tested (skipped per request)",
+    "frontend": "85%"
+  },
+  "seed_data_creation": "Used isolated finance_tracker_data_v1 fixtures for an eligible Sueldo recurring income, eight mobile recurring rows, category cascade data, current/previous-month comparison totals, recurring/frequent CRUD, and notifications. No backend or shared data was modified.",
+  "should_call_test_agent_after_fix": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "FIX #3 passed with exact confirmation text mentioning gastos, gastos frecuentes y transacciones recurrentes, and cascade persistence passed. Comparison values passed at 30000/2000 previous vs 32000/2500 current (+6.7%, +25.0%, +5.4%). Recurring create/edit/toggle/delete and Frequent create/apply/edit/delete passed. Native browser notification permission was persistently denied by the automation environment even after clear/grant; denied handling worked, and toggle ON/OFF passed with a granted Notification API simulation. For FAB reproduction at 390x844, scroll a recurring delete center to x=322,y=778 and use page.mouse.click: elementFromPoint is fab-toggle and the FAB menu opens. Locator.click may choose an unobscured point and is insufficient for this overlap test.",
+  "rca_of_the_issue": "Recurring toast: applyPendingRecurring now returns 1 synchronously and persists correct data, so the previous count bug is fixed, but FinanceApp emits toast.success during its mount effect while App mounts the Sonner Toaster as a later sibling after Routes; the notification is apparently emitted before the toast listener is ready and is lost. FAB: the footer pb-40 adds end-of-page scrolling room and row compaction removes horizontal overflow, but the FAB remains a z-50 fixed overlay; any recurring row can still be scrolled beneath its hit box, so a physical center tap is routed to fab-toggle."
+}

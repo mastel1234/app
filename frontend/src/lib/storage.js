@@ -7,6 +7,7 @@ const defaultData = {
   categories: [], // { id, name, color, monthlyLimit }
   goals: [], // { id, name, targetAmount, currentAmount, month (YYYY-MM), note }
   frequents: [], // { id, name, amount, categoryId, note }
+  recurring: [], // { id, kind: 'income'|'expense', name, amount, categoryId?, source?, dayOfMonth (1-31), note, active, lastAppliedMonth (YYYY-MM|null) }
   notificationsEnabled: false,
   notifiedThresholds: {}, // { "YYYY-MM_categoryId": [80, 100] }
 };

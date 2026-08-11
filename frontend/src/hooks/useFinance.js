@@ -46,6 +46,7 @@ export function useFinance() {
       categories: d.categories.filter((c) => c.id !== id),
       expenses: d.expenses.filter((e) => e.categoryId !== id),
       frequents: (d.frequents || []).filter((f) => f.categoryId !== id),
+      recurring: (d.recurring || []).filter((r) => !(r.kind === 'expense' && r.categoryId === id)),
     }));
   }, []);
 
@@ -78,7 +79,7 @@ export function useFinance() {
   }, []);
 
   const resetAll = useCallback(() => {
-    setData({ currency: data.currency, incomes: [], expenses: [], categories: [], goals: [], frequents: [], notificationsEnabled: false, notifiedThresholds: {} });
+    setData({ currency: data.currency, incomes: [], expenses: [], categories: [], goals: [], frequents: [], recurring: [], notificationsEnabled: false, notifiedThresholds: {} });
   }, [data.currency]);
 
   const importAll = useCallback((next) => setData(next), []);
@@ -122,6 +123,67 @@ export function useFinance() {
     });
   }, []);
 
+  const addRecurring = useCallback((rec) => {
+    setData((d) => ({
+      ...d,
+      recurring: [...(d.recurring || []), { id: uid(), active: true, lastAppliedMonth: null, ...rec }],
+    }));
+  }, []);
+
+  const updateRecurring = useCallback((id, updates) => {
+    setData((d) => ({
+      ...d,
+      recurring: (d.recurring || []).map((r) => (r.id === id ? { ...r, ...updates } : r)),
+    }));
+  }, []);
+
+  const deleteRecurring = useCallback((id) => {
+    setData((d) => ({ ...d, recurring: (d.recurring || []).filter((r) => r.id !== id) }));
+  }, []);
+
+  const applyPendingRecurring = useCallback(() => {
+    const now = new Date();
+    const curMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+    const today = now.getDate();
+    const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
+
+    // Pure calculation first (no side effects), so we can return count synchronously
+    const list = data.recurring || [];
+    const eligible = list.filter((r) => {
+      if (!r.active) return false;
+      if (r.lastAppliedMonth === curMonth) return false;
+      if (r.kind === 'expense' && !r.categoryId) return false;
+      const effectiveDay = Math.min(Number(r.dayOfMonth) || 1, daysInMonth);
+      return today >= effectiveDay;
+    });
+
+    if (eligible.length === 0) return 0;
+
+    const newIncomes = [];
+    const newExpenses = [];
+    const eligibleIds = new Set(eligible.map((r) => r.id));
+
+    eligible.forEach((r) => {
+      const effectiveDay = Math.min(Number(r.dayOfMonth) || 1, daysInMonth);
+      const date = `${curMonth}-${String(effectiveDay).padStart(2, '0')}`;
+      const note = r.note ? `${r.note} (recurrente)` : 'Recurrente';
+      if (r.kind === 'income') {
+        newIncomes.push({ id: uid(), amount: Number(r.amount), source: r.source || r.name, date, note });
+      } else {
+        newExpenses.push({ id: uid(), amount: Number(r.amount), categoryId: r.categoryId, date, note });
+      }
+    });
+
+    setData((d) => ({
+      ...d,
+      incomes: [...d.incomes, ...newIncomes],
+      expenses: [...d.expenses, ...newExpenses],
+      recurring: (d.recurring || []).map((r) => (eligibleIds.has(r.id) ? { ...r, lastAppliedMonth: curMonth } : r)),
+    }));
+
+    return eligible.length;
+  }, [data.recurring]);
+
   const monthly = useMemo(() => {
     const incomes = data.incomes.filter((i) => monthKey(i.date) === selectedMonth);
     const expenses = data.expenses.filter((e) => monthKey(e.date) === selectedMonth);
@@ -140,6 +202,25 @@ export function useFinance() {
 
     return { incomes, expenses, goals, totalIncome, totalExpense, balance, byCategory, overLimit };
   }, [data, selectedMonth]);
+
+  const previousMonth = useMemo(() => {
+    const [y, m] = selectedMonth.split('-').map(Number);
+    const d = new Date(y, m - 2, 1); // m is 1-indexed; -2 gives previous month
+    return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
+  }, [selectedMonth]);
+
+  const previousMonthly = useMemo(() => {
+    const incomes = data.incomes.filter((i) => monthKey(i.date) === previousMonth);
+    const expenses = data.expenses.filter((e) => monthKey(e.date) === previousMonth);
+    const totalIncome = incomes.reduce((s, i) => s + Number(i.amount), 0);
+    const totalExpense = expenses.reduce((s, e) => s + Number(e.amount), 0);
+    const balance = totalIncome - totalExpense;
+    const byCategory = data.categories.map((cat) => {
+      const spent = expenses.filter((e) => e.categoryId === cat.id).reduce((s, e) => s + Number(e.amount), 0);
+      return { ...cat, spent };
+    });
+    return { month: previousMonth, incomes, expenses, totalIncome, totalExpense, balance, byCategory };
+  }, [data, previousMonth]);
 
   const availableMonths = useMemo(() => {
     const set = new Set([selectedMonth, currentMonth()]);
@@ -174,5 +255,11 @@ export function useFinance() {
     applyFrequent,
     setNotificationsEnabled,
     markThresholdNotified,
+    addRecurring,
+    updateRecurring,
+    deleteRecurring,
+    applyPendingRecurring,
+    previousMonth,
+    previousMonthly,
   };
 }

@@ -6,12 +6,12 @@ import FinanceApp from "@/pages/FinanceApp";
 function App() {
   return (
     <div className="App">
+      <Toaster position="top-right" richColors />
       <BrowserRouter>
         <Routes>
           <Route path="/" element={<FinanceApp />} />
         </Routes>
       </BrowserRouter>
-      <Toaster position="top-right" richColors />
     </div>
   );
 }

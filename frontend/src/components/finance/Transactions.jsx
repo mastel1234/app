@@ -12,6 +12,7 @@ import { Tabs, TabsList, TabsTrigger, TabsContent } from '@/components/ui/tabs';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { formatMoney } from '@/lib/currency';
 import FrequentExpenses from '@/components/finance/FrequentExpenses';
+import RecurringTransactions from '@/components/finance/RecurringTransactions';
 
 function todayStr() {
   return new Date().toISOString().slice(0, 10);
@@ -172,6 +173,8 @@ export default function Transactions({ finance }) {
       </div>
 
       <FrequentExpenses finance={finance} />
+
+      <RecurringTransactions finance={finance} />
 
       <Card className="shadow-sm">
         <CardHeader>

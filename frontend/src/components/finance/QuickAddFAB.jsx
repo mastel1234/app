@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect, useRef } from 'react';
 import { toast } from 'sonner';
 import { Plus, ArrowUpCircle, ArrowDownCircle, X, Zap } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -15,10 +15,33 @@ function todayStr() {
 export default function QuickAddFAB({ finance }) {
   const [menuOpen, setMenuOpen] = useState(false);
   const [dialogType, setDialogType] = useState(null); // 'expense' | 'income' | 'frequent'
+  const [visible, setVisible] = useState(true);
   const [amount, setAmount] = useState('');
   const [categoryId, setCategoryId] = useState('');
   const [source, setSource] = useState('');
   const [note, setNote] = useState('');
+  const lastScrollY = useRef(0);
+  const hideTimer = useRef(null);
+
+  // Hide FAB on scroll down, show on scroll up or scroll stop.
+  // This avoids the fixed FAB blocking hit-targets in the middle of the page.
+  useEffect(() => {
+    const onScroll = () => {
+      const y = window.scrollY || window.pageYOffset;
+      const delta = y - lastScrollY.current;
+      lastScrollY.current = y;
+      if (menuOpen || dialogType !== null) return;
+      if (delta > 4 && y > 80) setVisible(false);
+      else if (delta < -4) setVisible(true);
+      if (hideTimer.current) clearTimeout(hideTimer.current);
+      hideTimer.current = setTimeout(() => setVisible(true), 800);
+    };
+    window.addEventListener('scroll', onScroll, { passive: true });
+    return () => {
+      window.removeEventListener('scroll', onScroll);
+      if (hideTimer.current) clearTimeout(hideTimer.current);
+    };
+  }, [menuOpen, dialogType]);
 
   const currency = finance.data.currency;
   const categories = finance.monthly.byCategory;
@@ -85,7 +108,10 @@ export default function QuickAddFAB({ finance }) {
 
   return (
     <>
-      <div className="fixed bottom-6 right-4 sm:right-6 z-50 flex flex-col items-end gap-3" data-testid="fab-container">
+      <div
+        className={`fixed bottom-6 right-4 sm:right-6 z-50 flex flex-col items-end gap-3 transition-all duration-300 ${visible || menuOpen ? 'translate-y-0 opacity-100 pointer-events-auto' : 'translate-y-24 opacity-0 pointer-events-none'}`}
+        data-testid="fab-container"
+      >
         {menuOpen && (
           <div className="flex flex-col gap-2 stagger-in">
             {frequents.length > 0 && (
