@@ -1,0 +1,49 @@
+{
+  "summary": "Frontend-only automated E2E, persistence, edge-case, regression, responsive UI, and code review testing completed on the public URL. All requested Ahorro Automático calculations, toasts, history rendering, disabled states, current-month exclusion, deficit handling, and idempotency passed. Recurring auto-apply/toast, Comparison, Frequent Expenses, Notifications, and FAB hide-on-scroll regressions passed. One additional state-consistency defect was reproduced when deleting the selected goal, plus a minor expected-copy mismatch.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "SettingsPanel / Ahorro Automático no-goal state",
+        "issue": "The expected copy is 'Primero crea una meta en la pestaña Metas', but the UI renders 'Primero crea una meta en la pestaña \"Metas\".' with added quotation marks and punctuation.",
+        "selector": "[data-testid='autosave-toggle']",
+        "priority": "LOW"
+      }
+    ],
+    "integration_issues": [
+      {
+        "flow": "Delete the goal currently selected as the automatic-savings destination",
+        "issue": "Deleting the selected/last goal removes it from goals but leaves autoSaveEnabled=true and autoSaveGoalId pointing to the deleted ID. Settings then shows a disabled yet checked auto-save switch. Future processing silently returns without saving until the user creates and explicitly selects another goal.",
+        "affected_selectors": [
+          "[data-testid='delete-goal-g1']",
+          "[data-testid='autosave-toggle']",
+          "[data-testid='autosave-goal-select']"
+        ]
+      }
+    ],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [
+    "When deleteGoal removes the goal referenced by autoSaveGoalId, clear autoSaveGoalId and turn off autoSaveEnabled so Settings cannot display a disabled checked switch or retain a dangling destination.",
+    "Align the no-goal guidance copy exactly with the requested text if exact product copy is required."
+  ],
+  "critical_code_review_comments": [
+    "useFinance.deleteGoal only filters goals and does not reconcile autoSaveGoalId/autoSaveEnabled. This creates a dangling reference and makes applyPendingAutoSave silently no-op because its goal lookup fails. Update these fields atomically in the same setData callback when the deleted ID is the selected destination."
+  ],
+  "updated_files": [
+    "/app/test_reports/iteration_7.json"
+  ],
+  "success_rate": {
+    "backend": "not tested (skipped per request)",
+    "frontend": "95%"
+  },
+  "seed_data_creation": "Used isolated localStorage fixtures under finance_tracker_data_v1 for two positive closed months, a deficit month, current-month-only activity, disabled/missing destination states, selected-goal deletion, recurring income, comparison values, frequent expenses, notification permission simulation, and a tall mobile recurring list. No backend or shared data was modified.",
+  "should_call_test_agent_after_fix": false,
+  "should_main_agent_self_test": true,
+  "context_for_next_testing_agent": "Browser calendar was 2026-08; positive fixture used 2026-06 leftover 5000 and 2026-07 leftover 10000. Goal became RD$15,000, toast and history passed, and a second reload was idempotent. A 2026-07 deficit was recorded with skipped=true/amount=0 while 2026-08 was excluded. All requested regressions passed, including the previously missing recurring mount toast. Retest selected-goal deletion by seeding g1 as enabled destination, deleting g1, and checking that both autoSaveEnabled and autoSaveGoalId are cleared.",
+  "rca_of_the_issue": "Reproduction: seed autoSaveEnabled=true, autoSaveGoalId='g1', and one goal g1; delete g1 in Metas; open Ajustes. Storage retains the stale destination and enabled flag, and the no-goal switch is disabled but checked. Root cause: deleteGoal updates only goals and has no atomic cascade for the auto-save configuration. The copy mismatch is literal text in SettingsPanel lines 140-142."
+}

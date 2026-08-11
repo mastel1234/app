@@ -41,6 +41,7 @@ Usuario individual que quiere administrar sus finanzas personales de forma priva
 - **Transacciones Recurrentes (2026-02-11)**: Modelo con `dayOfMonth`, `kind`, `active`, `lastAppliedMonth`. Auto-aplica pendientes al abrir la app en el día correspondiente (idempotente). Toast de confirmación. Toggle activar/pausar, edición y borrado en cascada. Ubicado en la pestaña Movimientos.
 - **Comparación Mensual (2026-02-11)**: Card en el Dashboard con 3 mini-KPIs (Ingresos, Gastos, Balance) mostrando delta % vs mes anterior, más gráfico de barras comparativo. Colores invertidos para gastos (subir es malo).
 - **FAB inteligente (2026-02-11)**: Se oculta automáticamente al hacer scroll hacia abajo (`pointer-events:none`) para no bloquear botones de acción en el flujo scrollable; reaparece al hacer scroll arriba o al detenerse.
+- **Ahorro Automático (2026-02-11)**: Al abrir la app, procesa todos los meses cerrados (anteriores al mes actual). Si el balance del mes cerrado > 0, transfiere el sobrante a la meta configurada. Registra cada mes procesado en `autoSavedMonths` para idempotencia. Historial visible en la pestaña Metas. Cascade en deleteGoal (limpia destino y desactiva si se borra la meta).
 
 ## Testing
 - iteration_1: 100% frontend PASS (baseline)
@@ -50,6 +51,7 @@ Usuario individual que quiere administrar sus finanzas personales de forma priva
 - iteration_5: 91% (3 bugs in Recurring + Comparison)
 - iteration_6: 85% (2 bugs remaining: toast + FAB overlap)
 - iteration_7 (manual): PASS — recurring toast fires (Toaster moved before Router + setTimeout defer); FAB hides on scroll-down with pointer-events:none, restores on scroll-up/idle
+- iteration_7 (auto): 95% — Ahorro Automático PASS; fixed cascade en deleteGoal + copia sin comillas
 
 ## Backlog / P1-P2
 - P1: Auto-categorización por palabra clave (Uber → Transporte)

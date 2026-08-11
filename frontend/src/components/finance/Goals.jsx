@@ -1,8 +1,8 @@
 import { useState } from 'react';
 import { toast } from 'sonner';
-import { Plus, Trash2, Target, Pencil } from 'lucide-react';
+import { Plus, Trash2, Target, Pencil, PiggyBank } from 'lucide-react';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -164,6 +164,46 @@ export default function Goals({ finance }) {
         currency={currency}
         defaultMonth={finance.selectedMonth}
       />
+
+      <AutoSaveHistory finance={finance} />
     </div>
+  );
+}
+
+function AutoSaveHistory({ finance }) {
+  const savedMonths = finance.data.autoSavedMonths || {};
+  const entries = Object.entries(savedMonths).sort((a, b) => b[0].localeCompare(a[0]));
+  const currency = finance.data.currency;
+  if (entries.length === 0) return null;
+  return (
+    <Card className="shadow-sm" data-testid="autosave-history-card">
+      <CardHeader>
+        <CardTitle className="text-lg font-display flex items-center gap-2">
+          <PiggyBank className="w-4 h-4 text-primary" /> Historial de Ahorro Automático
+        </CardTitle>
+        <CardDescription>Cierres de mes procesados automáticamente.</CardDescription>
+      </CardHeader>
+      <CardContent>
+        <div className="space-y-2">
+          {entries.map(([month, info]) => (
+            <div
+              key={month}
+              className={`flex items-center justify-between rounded-md border border-border p-3 ${info.skipped ? 'bg-muted/40' : 'bg-[hsl(var(--success))]/10'}`}
+              data-testid={`autosave-entry-${month}`}
+            >
+              <div className="min-w-0">
+                <p className="font-semibold text-sm">{month}</p>
+                <p className="text-xs text-muted-foreground truncate">
+                  {info.skipped ? 'Sin sobrante para transferir' : `→ ${info.goalName || 'Meta'}`}
+                </p>
+              </div>
+              <span className={`text-base font-display font-bold tabular-nums shrink-0 ${info.skipped ? 'text-muted-foreground' : 'text-[hsl(var(--success))]'}`}>
+                {info.skipped ? '—' : `+ ${formatMoney(info.amount, currency)}`}
+              </span>
+            </div>
+          ))}
+        </div>
+      </CardContent>
+    </Card>
   );
 }

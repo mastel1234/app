@@ -34,6 +34,24 @@ export default function FinanceApp() {
     }
   }, [finance]);
 
+  // Auto-save leftover balance of closed months to selected goal
+  const didRunAutoSave = useRef(false);
+  useEffect(() => {
+    if (didRunAutoSave.current) return;
+    if (!finance.data.autoSaveEnabled || !finance.data.autoSaveGoalId) return;
+    didRunAutoSave.current = true;
+    const applied = finance.applyPendingAutoSave();
+    if (applied && applied.length > 0) {
+      const total = applied.reduce((s, a) => s + a.amount, 0);
+      setTimeout(() => {
+        toast.success(`Ahorro automático: se transfirieron ${applied.length} mes(es) cerrado(s) a tu meta.`, {
+          description: `Total ahorrado: ${new Intl.NumberFormat('es-DO', { style: 'currency', currency: finance.data.currency }).format(total)}`,
+          duration: 6000,
+        });
+      }, 100);
+    }
+  }, [finance]);
+
   return (
     <div className="min-h-screen bg-background" data-testid="finance-app">
       <header className="border-b border-border bg-card/60 backdrop-blur-sm sticky top-0 z-40">

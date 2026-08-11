@@ -75,11 +75,18 @@ export function useFinance() {
   }, []);
 
   const deleteGoal = useCallback((id) => {
-    setData((d) => ({ ...d, goals: d.goals.filter((g) => g.id !== id) }));
+    setData((d) => {
+      const isAutoSaveTarget = d.autoSaveGoalId === id;
+      return {
+        ...d,
+        goals: d.goals.filter((g) => g.id !== id),
+        ...(isAutoSaveTarget ? { autoSaveGoalId: null, autoSaveEnabled: false } : {}),
+      };
+    });
   }, []);
 
   const resetAll = useCallback(() => {
-    setData({ currency: data.currency, incomes: [], expenses: [], categories: [], goals: [], frequents: [], recurring: [], notificationsEnabled: false, notifiedThresholds: {} });
+    setData({ currency: data.currency, incomes: [], expenses: [], categories: [], goals: [], frequents: [], recurring: [], notificationsEnabled: false, notifiedThresholds: {}, autoSaveEnabled: false, autoSaveGoalId: null, autoSavedMonths: {} });
   }, [data.currency]);
 
   const importAll = useCallback((next) => setData(next), []);
@@ -184,6 +191,72 @@ export function useFinance() {
     return eligible.length;
   }, [data.recurring]);
 
+  const setAutoSaveEnabled = useCallback((v) => {
+    setData((d) => ({ ...d, autoSaveEnabled: !!v }));
+  }, []);
+
+  const setAutoSaveGoal = useCallback((goalId) => {
+    setData((d) => ({ ...d, autoSaveGoalId: goalId || null }));
+  }, []);
+
+  const applyPendingAutoSave = useCallback(() => {
+    if (!data.autoSaveEnabled || !data.autoSaveGoalId) return [];
+    const goal = data.goals.find((g) => g.id === data.autoSaveGoalId);
+    if (!goal) return [];
+
+    const now = new Date();
+    const curMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
+
+    // Collect all months with any activity
+    const monthsSet = new Set();
+    data.incomes.forEach((i) => { const m = monthKey(i.date); if (m) monthsSet.add(m); });
+    data.expenses.forEach((e) => { const m = monthKey(e.date); if (m) monthsSet.add(m); });
+
+    // Filter to CLOSED months (strictly before current calendar month)
+    const closedMonths = Array.from(monthsSet)
+      .filter((m) => m < curMonth)
+      .sort();
+
+    const already = data.autoSavedMonths || {};
+    const applied = [];
+
+    closedMonths.forEach((m) => {
+      if (already[m]) return; // already processed
+      const totalIn = data.incomes.filter((i) => monthKey(i.date) === m).reduce((s, i) => s + Number(i.amount), 0);
+      const totalOut = data.expenses.filter((e) => monthKey(e.date) === m).reduce((s, e) => s + Number(e.amount), 0);
+      const leftover = totalIn - totalOut;
+      if (leftover > 0) {
+        applied.push({ month: m, amount: leftover });
+      } else {
+        applied.push({ month: m, amount: 0, skipped: true });
+      }
+    });
+
+    const actuallyApplied = applied.filter((a) => !a.skipped);
+    if (applied.length === 0) return [];
+
+    setData((d) => {
+      const newAutoSaved = { ...(d.autoSavedMonths || {}) };
+      let totalAdded = 0;
+      applied.forEach((a) => {
+        newAutoSaved[a.month] = {
+          goalId: d.autoSaveGoalId,
+          goalName: goal.name,
+          amount: a.amount,
+          date: new Date().toISOString().slice(0, 10),
+          skipped: !!a.skipped,
+        };
+        if (!a.skipped) totalAdded += a.amount;
+      });
+      const newGoals = d.goals.map((g) =>
+        g.id === d.autoSaveGoalId ? { ...g, currentAmount: Number(g.currentAmount || 0) + totalAdded } : g
+      );
+      return { ...d, autoSavedMonths: newAutoSaved, goals: newGoals };
+    });
+
+    return actuallyApplied;
+  }, [data.autoSaveEnabled, data.autoSaveGoalId, data.goals, data.incomes, data.expenses, data.autoSavedMonths]);
+
   const monthly = useMemo(() => {
     const incomes = data.incomes.filter((i) => monthKey(i.date) === selectedMonth);
     const expenses = data.expenses.filter((e) => monthKey(e.date) === selectedMonth);
@@ -259,6 +332,9 @@ export function useFinance() {
     updateRecurring,
     deleteRecurring,
     applyPendingRecurring,
+    setAutoSaveEnabled,
+    setAutoSaveGoal,
+    applyPendingAutoSave,
     previousMonth,
     previousMonthly,
   };

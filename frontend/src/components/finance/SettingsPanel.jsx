@@ -1,6 +1,6 @@
 import { useRef, useState } from 'react';
 import { toast } from 'sonner';
-import { Download, FileText, Upload, RotateCcw, Bell, BellOff } from 'lucide-react';
+import { Download, FileText, Upload, RotateCcw, Bell, BellOff, PiggyBank } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
@@ -103,6 +103,60 @@ export default function SettingsPanel({ finance }) {
         <h2 className="text-2xl font-display font-bold">Ajustes</h2>
         <p className="text-sm text-muted-foreground">Configura la moneda y gestiona tus datos.</p>
       </div>
+
+      <Card className="shadow-sm">
+        <CardHeader>
+          <CardTitle className="text-lg font-display flex items-center gap-2">
+            <PiggyBank className="w-4 h-4 text-primary" /> Ahorro Automático
+          </CardTitle>
+          <CardDescription>
+            Al cerrar el mes, el sobrante del balance (Ingresos − Gastos) se transfiere automáticamente a la meta que elijas.
+          </CardDescription>
+        </CardHeader>
+        <CardContent className="space-y-4">
+          <div className="flex items-center justify-between gap-4">
+            <div>
+              <Label htmlFor="autosave-toggle" className="text-base font-medium">Activar ahorro automático</Label>
+              <p className="text-xs text-muted-foreground mt-1">Solo se aplica cuando el balance del mes cerrado es positivo.</p>
+            </div>
+            <Switch
+              id="autosave-toggle"
+              checked={!!finance.data.autoSaveEnabled}
+              onCheckedChange={(v) => {
+                finance.setAutoSaveEnabled(v);
+                if (v && !finance.data.autoSaveGoalId) {
+                  toast.info('Selecciona una meta destino abajo.');
+                } else {
+                  toast.success(v ? 'Ahorro automático activado' : 'Ahorro automático desactivado');
+                }
+              }}
+              disabled={finance.data.goals.length === 0}
+              data-testid="autosave-toggle"
+            />
+          </div>
+          <div>
+            <Label htmlFor="autosave-goal" className="text-sm">Meta destino</Label>
+            {finance.data.goals.length === 0 ? (
+              <p className="text-xs text-muted-foreground mt-2">
+                Primero crea una meta en la pestaña Metas
+              </p>
+            ) : (
+              <Select value={finance.data.autoSaveGoalId || ''} onValueChange={(v) => { finance.setAutoSaveGoal(v); toast.success('Meta destino actualizada'); }}>
+                <SelectTrigger className="mt-2 w-full sm:w-[320px]" data-testid="autosave-goal-select">
+                  <SelectValue placeholder="Selecciona una meta" />
+                </SelectTrigger>
+                <SelectContent>
+                  {finance.data.goals.map((g) => (
+                    <SelectItem key={g.id} value={g.id} data-testid={`autosave-goal-opt-${g.id}`}>
+                      {g.name} — {g.month}
+                    </SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            )}
+          </div>
+        </CardContent>
+      </Card>
 
       <Card className="shadow-sm">
         <CardHeader>

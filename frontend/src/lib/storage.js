@@ -10,6 +10,9 @@ const defaultData = {
   recurring: [], // { id, kind: 'income'|'expense', name, amount, categoryId?, source?, dayOfMonth (1-31), note, active, lastAppliedMonth (YYYY-MM|null) }
   notificationsEnabled: false,
   notifiedThresholds: {}, // { "YYYY-MM_categoryId": [80, 100] }
+  autoSaveEnabled: false,
+  autoSaveGoalId: null,
+  autoSavedMonths: {}, // { "YYYY-MM": { goalId, amount, date, goalName } }
 };
 
 export function loadData() {
