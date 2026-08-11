@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import { Plus, Pencil, Trash2, AlertTriangle } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -15,9 +15,17 @@ const COLOR_OPTIONS = [
 ];
 
 function CategoryDialog({ open, onOpenChange, onSave, initial, currency }) {
-  const [name, setName] = useState(initial?.name || '');
-  const [limit, setLimit] = useState(initial?.monthlyLimit?.toString() || '');
-  const [color, setColor] = useState(initial?.color || COLOR_OPTIONS[0]);
+  const [name, setName] = useState('');
+  const [limit, setLimit] = useState('');
+  const [color, setColor] = useState(COLOR_OPTIONS[0]);
+
+  useEffect(() => {
+    if (open) {
+      setName(initial?.name || '');
+      setLimit(initial?.monthlyLimit != null ? initial.monthlyLimit.toString() : '');
+      setColor(initial?.color || COLOR_OPTIONS[0]);
+    }
+  }, [open, initial]);
 
   const submit = () => {
     if (!name.trim()) {

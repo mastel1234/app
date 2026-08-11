@@ -38,6 +38,7 @@ export default function Dashboard({ finance, onGoToCategories }) {
   const savingsRate = monthly.totalIncome > 0 ? Math.round((monthly.balance / monthly.totalIncome) * 100) : 0;
 
   const barData = monthly.byCategory.map((c) => ({
+    id: c.id,
     name: c.name.length > 12 ? c.name.slice(0, 12) + '…' : c.name,
     Gastado: Math.round(c.spent),
     Límite: Math.round(c.monthlyLimit),
@@ -46,7 +47,7 @@ export default function Dashboard({ finance, onGoToCategories }) {
 
   const pieData = monthly.byCategory
     .filter((c) => c.spent > 0)
-    .map((c) => ({ name: c.name, value: Math.round(c.spent), color: c.color }));
+    .map((c) => ({ id: c.id, name: c.name, value: Math.round(c.spent), color: c.color }));
 
   const CHART_COLORS = ['#2C5F4A', '#4B8B6B', '#D89A3F', '#C4623C', '#5B7FA0', '#8B6BAE'];
 
@@ -92,8 +93,8 @@ export default function Dashboard({ finance, onGoToCategories }) {
                   <Legend />
                   <Bar dataKey="Límite" fill="hsl(var(--muted-foreground))" opacity={0.35} radius={[4, 4, 0, 0]} />
                   <Bar dataKey="Gastado" radius={[4, 4, 0, 0]}>
-                    {barData.map((entry, i) => (
-                      <Cell key={i} fill={entry.over ? 'hsl(var(--destructive))' : 'hsl(var(--primary))'} />
+                    {barData.map((entry) => (
+                      <Cell key={`bar-${entry.id}`} fill={entry.over ? 'hsl(var(--destructive))' : 'hsl(var(--primary))'} />
                     ))}
                   </Bar>
                 </BarChart>
@@ -114,7 +115,7 @@ export default function Dashboard({ finance, onGoToCategories }) {
                 <PieChart>
                   <Pie data={pieData} dataKey="value" nameKey="name" cx="50%" cy="50%" innerRadius={55} outerRadius={95} paddingAngle={2}>
                     {pieData.map((entry, i) => (
-                      <Cell key={i} fill={entry.color || CHART_COLORS[i % CHART_COLORS.length]} />
+                      <Cell key={`pie-${entry.id}`} fill={entry.color || CHART_COLORS[i % CHART_COLORS.length]} />
                     ))}
                   </Pie>
                   <Tooltip formatter={(v) => formatMoney(v, currency)} />

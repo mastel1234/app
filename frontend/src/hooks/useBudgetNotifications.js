@@ -20,14 +20,19 @@ export function showNotification(title, options = {}) {
     if ('serviceWorker' in navigator && navigator.serviceWorker.ready) {
       navigator.serviceWorker.ready
         .then((reg) => reg.showNotification(title, { icon: '/icon-192.png', badge: '/icon-192.png', ...options }))
-        .catch(() => {
-          new Notification(title, { icon: '/icon-192.png', ...options });
+        .catch((err) => {
+          console.warn('SW showNotification failed, falling back to Notification()', err);
+          try {
+            new Notification(title, { icon: '/icon-192.png', ...options });
+          } catch (fallbackErr) {
+            console.warn('Fallback Notification() failed', fallbackErr);
+          }
         });
     } else {
       new Notification(title, { icon: '/icon-192.png', ...options });
     }
-  } catch {
-    /* noop */
+  } catch (err) {
+    console.warn('showNotification failed', err);
   }
 }
 

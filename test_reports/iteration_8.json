@@ -1,0 +1,54 @@
+{
+  "summary": "Frontend-only regression and code-review testing completed on the public URL. Root load, all 5 tabs, notification warning/fallback behavior, charts with 3 uniquely named categories, full create/persist/export flow, recurring and auto-save mount toasts/idempotency, dashboard KPIs, comparison, and auto-save history passed. FIX #2 remains incomplete for allowed duplicate category names, and Category/Goal edit dialogs fail to hydrate selected records.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [
+      {
+        "component": "Dashboard PieChart",
+        "issue": "Two categories with the same allowed name generate React's duplicate-key warning for 'pie-Duplicada'. The chart rendered 3 sectors in this run, but React warns that children may be duplicated or omitted during reconciliation.",
+        "selector": ".recharts-pie-sector",
+        "priority": "HIGH"
+      },
+      {
+        "component": "Categories / CategoryDialog",
+        "issue": "Editing an existing category opens an Editar Categoría dialog with blank/default fields instead of the selected category values.",
+        "selector": "[data-testid='edit-cat-c1'], [data-testid='category-name-input']",
+        "priority": "HIGH"
+      },
+      {
+        "component": "Goals / GoalDialog",
+        "issue": "Editing an existing goal opens an Editar Meta dialog with blank/default fields instead of the selected goal values.",
+        "selector": "[data-testid='edit-goal-g1'], [data-testid='goal-name-input']",
+        "priority": "HIGH"
+      }
+    ],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [
+    "Propagate category id into Dashboard barData/pieData and use id-based Cell keys; category names are not unique, and the bar key remains index-dependent.",
+    "Synchronize CategoryDialog form state from initial whenever the dialog opens or the selected category changes.",
+    "Synchronize GoalDialog form state from initial whenever the dialog opens or the selected goal changes.",
+    "Retest duplicate-name chart reconciliation and both edit/save flows after fixes."
+  ],
+  "critical_code_review_comments": [
+    "Dashboard Pie Cell uses key `pie-${entry.name}` even though category creation does not enforce unique names. Reproduced React duplicate-key warning with two categories named Duplicada. Bar Cell uses `bar-${entry.name}-${i}`, which avoids duplicates but is still not stable under reordering because it contains the array index and the name is truncated in barData.",
+    "CategoryDialog and GoalDialog derive form state with useState(initial...) only on component mount. Unlike FrequentDialog and RecurringDialog, they have no useEffect keyed by open/initial, so later edit selections never hydrate the form."
+  ],
+  "updated_files": [
+    "/app/test_reports/iteration_8.json"
+  ],
+  "success_rate": {
+    "backend": "not tested (skipped per request)",
+    "frontend": "90%"
+  },
+  "seed_data_creation": "Used isolated finance_tracker_data_v1 fixtures and UI-created QA data for categories, current/previous-month incomes and expenses, a frequent expense, recurring income, goal, notifications, auto-save, duplicate category names, and edit-dialog diagnostics. No backend/shared data was modified.",
+  "should_call_test_agent_after_fix": true,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "FIX #1 passed: with Notification.permission mocked granted, enabling notifications in Ajustes and spending 850/1000 caused one SW showNotification attempt; forced SW rejection emitted console.warn containing TEST_SW_FAILURE and then attempted fallback Notification(). FIX #2 passed for three unique categories: 12 bar rectangles, 3 pie sectors, then 12/2 after switching month, with no key warnings or visual glitch. Duplicate category names reproduce warning 'Encountered two children with the same key, pie-Duplicada'. Full UI flow created two categories, FAB income/expense, Movimientos income/expense, frequent applied through FAB, recurring, goal, auto-save, USD currency, CSV/PDF downloads, and localStorage persistence. CSV/PDF filenames were finanzas_2026-08.csv/pdf. Seeded mount test rendered both recurring and auto-save success toasts; second reload created no duplicate data/toasts. USD is rendered as '$', not 'US$'.",
+  "rca_of_the_issue": "Chart RCA: pieData discards category id and Cell identity is derived from non-unique category name; barData also discards id and includes array index in the key. Edit-dialog RCA: CategoryDialog and GoalDialog stay mounted while initial changes, but useState(initial...) runs only on first mount, leaving stale/blank state. Reproduction: seed c1/g1, click their edit buttons, and inspect category-name-input/goal-name-input; both are empty."
+}

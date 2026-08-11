@@ -1,4 +1,4 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
 import { Plus, Trash2, Target, Pencil, PiggyBank } from 'lucide-react';
 import { Button } from '@/components/ui/button';
@@ -10,10 +10,19 @@ import { Progress } from '@/components/ui/progress';
 import { formatMoney } from '@/lib/currency';
 
 function GoalDialog({ open, onOpenChange, onSave, initial, currency, defaultMonth }) {
-  const [name, setName] = useState(initial?.name || '');
-  const [target, setTarget] = useState(initial?.targetAmount?.toString() || '');
-  const [current, setCurrent] = useState(initial?.currentAmount?.toString() || '0');
-  const [month, setMonth] = useState(initial?.month || defaultMonth);
+  const [name, setName] = useState('');
+  const [target, setTarget] = useState('');
+  const [current, setCurrent] = useState('0');
+  const [month, setMonth] = useState(defaultMonth);
+
+  useEffect(() => {
+    if (open) {
+      setName(initial?.name || '');
+      setTarget(initial?.targetAmount != null ? initial.targetAmount.toString() : '');
+      setCurrent(initial?.currentAmount != null ? initial.currentAmount.toString() : '0');
+      setMonth(initial?.month || defaultMonth);
+    }
+  }, [open, initial, defaultMonth]);
 
   const submit = () => {
     if (!name.trim() || !target) {

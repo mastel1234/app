@@ -1,0 +1,27 @@
+{
+  "summary": "Frontend-only public-URL retest completed. All three iteration_8 fixes passed: duplicate category names render stable charts without React key warnings, CategoryDialog hydrates and rehydrates edited values, and GoalDialog hydrates and rehydrates edited values. Requested regression flows also passed.",
+  "backend_issues": {
+    "critical": [],
+    "minor": []
+  },
+  "frontend_issues": {
+    "ui_bugs": [],
+    "integration_issues": [],
+    "design_issues": []
+  },
+  "test_report_links": [],
+  "action_items": [],
+  "critical_code_review_comments": [],
+  "updated_files": [
+    "/app/test_reports/iteration_9.json"
+  ],
+  "success_rate": {
+    "backend": "not tested (skipped per request)",
+    "frontend": "100%"
+  },
+  "seed_data_creation": "Used isolated finance_tracker_data_v1 fixtures for duplicate category names, category/goal edits, current and closed-month transactions, recurring automation, auto-save, frequent expenses, notification settings, category/goal cascades, currency, and exports. No backend/shared data was modified.",
+  "should_call_test_agent_after_fix": false,
+  "should_main_agent_self_test": false,
+  "context_for_next_testing_agent": "Verified on https://monthly-budget-313.preview.emergentagent.com. Duplicate-name fixture c1/c2='Duplicada', c3='Otra' produced 3 pie sectors and 12 bar rectangles; switching 2026-08 -> empty 2026-07 -> 2026-08 restored the charts with no 'Encountered two children with the same key' warning. Category edit hydrated Alimentación/5000/#4B8B6B after Add-close, saved Comida, and reopened with Comida. Goal edit hydrated Fondo emergencia/10000/2500/2026-08, saved target 12000, and reopened with 12000. Regression passed for FAB income/expense creation and deletion, frequent expense application, recurring and auto-save mount toasts plus reload idempotency, notifications on/off with granted permission, category cascade, goal auto-save cleanup cascade, USD change, and CSV/PDF downloads.",
+  "rca_of_the_issue": "The iteration_8 defects are resolved as intended: Dashboard Cell identity now derives from category.id, while CategoryDialog and GoalDialog synchronize form state from the active initial record when opened. No unresolved issue was reproduced."
+}
