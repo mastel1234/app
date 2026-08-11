@@ -1,0 +1,202 @@
+import { useState } from 'react';
+import { toast } from 'sonner';
+import { Plus, ArrowUpCircle, ArrowDownCircle, X } from 'lucide-react';
+import { Button } from '@/components/ui/button';
+import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogDescription } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { formatMoney } from '@/lib/currency';
+
+function todayStr() {
+  return new Date().toISOString().slice(0, 10);
+}
+
+export default function QuickAddFAB({ finance }) {
+  const [menuOpen, setMenuOpen] = useState(false);
+  const [dialogType, setDialogType] = useState(null); // 'expense' | 'income'
+  const [amount, setAmount] = useState('');
+  const [categoryId, setCategoryId] = useState('');
+  const [source, setSource] = useState('');
+  const [note, setNote] = useState('');
+
+  const currency = finance.data.currency;
+  const categories = finance.monthly.byCategory;
+  const selectedCat = categories.find((c) => c.id === categoryId);
+
+  const openDialog = (type) => {
+    setDialogType(type);
+    setMenuOpen(false);
+    setAmount('');
+    setCategoryId('');
+    setSource('');
+    setNote('');
+  };
+
+  const close = () => setDialogType(null);
+
+  const submit = () => {
+    const amt = parseFloat(amount);
+    if (!amt || amt <= 0) {
+      toast.error('Ingresa un monto válido');
+      return;
+    }
+    const date = todayStr();
+    if (dialogType === 'expense') {
+      if (!categoryId) {
+        toast.error('Selecciona una categoría');
+        return;
+      }
+      finance.addExpense({ amount: amt, categoryId, date, note });
+      const cat = categories.find((c) => c.id === categoryId);
+      if (cat && cat.monthlyLimit > 0) {
+        const newSpent = cat.spent + amt;
+        const remaining = cat.monthlyLimit - newSpent;
+        if (remaining < 0) {
+          toast.error(`Excediste "${cat.name}" por ${formatMoney(-remaining, currency)}`, { duration: 5000 });
+        } else {
+          toast.success(`Gasto registrado. Disponible en "${cat.name}": ${formatMoney(remaining, currency)}`);
+        }
+      } else {
+        toast.success('Gasto registrado');
+      }
+    } else {
+      finance.addIncome({ amount: amt, source: source || 'Ingreso', date, note });
+      toast.success('Ingreso registrado');
+    }
+    close();
+  };
+
+  return (
+    <>
+      <div className="fixed bottom-6 right-4 sm:right-6 z-50 flex flex-col items-end gap-3" data-testid="fab-container">
+        {menuOpen && (
+          <div className="flex flex-col gap-2 stagger-in">
+            <button
+              onClick={() => openDialog('income')}
+              className="flex items-center gap-2 bg-card border border-border rounded-full pl-4 pr-5 py-2.5 shadow-lg hover:-translate-y-0.5 transition-transform"
+              data-testid="fab-income-btn"
+            >
+              <ArrowUpCircle className="w-5 h-5 text-[hsl(var(--success))]" />
+              <span className="text-sm font-semibold">Ingreso</span>
+            </button>
+            <button
+              onClick={() => openDialog('expense')}
+              className="flex items-center gap-2 bg-card border border-border rounded-full pl-4 pr-5 py-2.5 shadow-lg hover:-translate-y-0.5 transition-transform"
+              data-testid="fab-expense-btn"
+            >
+              <ArrowDownCircle className="w-5 h-5 text-destructive" />
+              <span className="text-sm font-semibold">Gasto</span>
+            </button>
+          </div>
+        )}
+        <button
+          onClick={() => setMenuOpen((o) => !o)}
+          className="w-14 h-14 rounded-full bg-primary text-primary-foreground shadow-xl flex items-center justify-center hover:scale-105 transition-transform active:scale-95"
+          data-testid="fab-toggle"
+          aria-label="Añadir movimiento"
+        >
+          {menuOpen ? <X className="w-6 h-6" /> : <Plus className="w-6 h-6" />}
+        </button>
+      </div>
+
+      <Dialog open={dialogType !== null} onOpenChange={(o) => !o && close()}>
+        <DialogContent data-testid="quick-add-dialog">
+          <DialogHeader>
+            <DialogTitle>{dialogType === 'expense' ? 'Registrar Gasto' : 'Registrar Ingreso'}</DialogTitle>
+            <DialogDescription>
+              {dialogType === 'expense'
+                ? 'Se descontará automáticamente del límite de la categoría elegida.'
+                : 'Se sumará al total de ingresos del mes.'}
+            </DialogDescription>
+          </DialogHeader>
+          <div className="space-y-4">
+            <div>
+              <Label htmlFor="fab-amount">Monto ({currency})</Label>
+              <Input
+                id="fab-amount"
+                type="number"
+                inputMode="decimal"
+                step="0.01"
+                autoFocus
+                value={amount}
+                onChange={(e) => setAmount(e.target.value)}
+                placeholder="0.00"
+                className="text-2xl h-14 font-display font-bold tabular-nums"
+                data-testid="fab-amount-input"
+              />
+            </div>
+            {dialogType === 'expense' ? (
+              <>
+                <div>
+                  <Label>Categoría</Label>
+                  <Select value={categoryId} onValueChange={setCategoryId}>
+                    <SelectTrigger data-testid="fab-category-select">
+                      <SelectValue placeholder="Selecciona una categoría" />
+                    </SelectTrigger>
+                    <SelectContent>
+                      {categories.length === 0 && (
+                        <div className="px-3 py-2 text-sm text-muted-foreground">Crea una categoría primero</div>
+                      )}
+                      {categories.map((c) => {
+                        const rem = c.monthlyLimit - c.spent;
+                        return (
+                          <SelectItem key={c.id} value={c.id}>
+                            <div className="flex items-center gap-2">
+                              <span className="w-2.5 h-2.5 rounded-full" style={{ backgroundColor: c.color }} />
+                              <span>{c.name}</span>
+                              {c.monthlyLimit > 0 && (
+                                <span className={`text-xs ml-auto pl-3 ${rem < 0 ? 'text-destructive' : 'text-muted-foreground'}`}>
+                                  {rem < 0 ? 'Excedido' : 'Disp.'}: {formatMoney(Math.abs(rem), currency)}
+                                </span>
+                              )}
+                            </div>
+                          </SelectItem>
+                        );
+                      })}
+                    </SelectContent>
+                  </Select>
+                </div>
+                {selectedCat && selectedCat.monthlyLimit > 0 && (
+                  <div className="rounded-md border border-border bg-secondary/50 p-3 text-sm" data-testid="fab-remaining-hint">
+                    <div className="flex justify-between mb-1">
+                      <span className="text-muted-foreground">Disponible antes:</span>
+                      <span className="font-semibold tabular-nums">{formatMoney(Math.max(selectedCat.monthlyLimit - selectedCat.spent, 0), currency)}</span>
+                    </div>
+                    {amount && !isNaN(parseFloat(amount)) && (
+                      <div className="flex justify-between pt-1 border-t border-border">
+                        <span className="text-muted-foreground">Disponible después:</span>
+                        <span className={`font-semibold tabular-nums ${selectedCat.monthlyLimit - selectedCat.spent - parseFloat(amount) < 0 ? 'text-destructive' : 'text-[hsl(var(--success))]'}`}>
+                          {formatMoney(selectedCat.monthlyLimit - selectedCat.spent - parseFloat(amount), currency)}
+                        </span>
+                      </div>
+                    )}
+                  </div>
+                )}
+              </>
+            ) : (
+              <div>
+                <Label htmlFor="fab-source">Fuente</Label>
+                <Input
+                  id="fab-source"
+                  value={source}
+                  onChange={(e) => setSource(e.target.value)}
+                  placeholder="Ej: Salario, Freelance…"
+                  data-testid="fab-source-input"
+                />
+              </div>
+            )}
+            <div>
+              <Label htmlFor="fab-note">Nota (opcional)</Label>
+              <Input id="fab-note" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Describe brevemente…" data-testid="fab-note-input" />
+            </div>
+          </div>
+          <DialogFooter>
+            <Button variant="outline" onClick={close}>Cancelar</Button>
+            <Button onClick={submit} data-testid="fab-submit-btn">Guardar</Button>
+          </DialogFooter>
+        </DialogContent>
+      </Dialog>
+    </>
+  );
+}

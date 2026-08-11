@@ -1,0 +1,26 @@
+{
+  "short_name": "Mis Finanzas",
+  "name": "Mis Finanzas - Control de Gastos",
+  "description": "Control mensual de ingresos y gastos con límites por categoría",
+  "icons": [
+    {
+      "src": "icon-192.png",
+      "sizes": "192x192",
+      "type": "image/png",
+      "purpose": "any maskable"
+    },
+    {
+      "src": "icon-512.png",
+      "sizes": "512x512",
+      "type": "image/png",
+      "purpose": "any maskable"
+    }
+  ],
+  "start_url": ".",
+  "display": "standalone",
+  "orientation": "portrait",
+  "theme_color": "#2C5F4A",
+  "background_color": "#F7F5EF",
+  "lang": "es",
+  "categories": ["finance", "productivity"]
+}

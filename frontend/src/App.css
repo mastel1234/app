@@ -1,0 +1,28 @@
+.App {
+    min-height: 100vh;
+}
+
+.stagger-in {
+    animation: fadeUp 0.4s ease-out both;
+}
+
+@keyframes fadeUp {
+    from { opacity: 0; transform: translateY(8px); }
+    to { opacity: 1; transform: translateY(0); }
+}
+
+.card-hover {
+    transition-property: transform, box-shadow, border-color;
+    transition-duration: 200ms;
+}
+.card-hover:hover {
+    transform: translateY(-2px);
+}
+
+/* Recharts tooltip */
+.recharts-default-tooltip {
+    background-color: hsl(var(--card)) !important;
+    border: 1px solid hsl(var(--border)) !important;
+    border-radius: 8px !important;
+    font-family: 'IBM Plex Sans', sans-serif !important;
+}

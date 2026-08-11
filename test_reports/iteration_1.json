@@ -1,0 +1,25 @@
+{
+  "summary": "Frontend-only smoke test of Mis Finanzas app. All 14 requested features verified end-to-end: Spanish header with DOP/RD$, 5 tabs, custom category creation (2 created), income + expense creation (over-limit), Dashboard KPIs update with DOP formatting, over-limit-alert renders with red progress bar, goals creation, currency switch to USD reflects across app, CSV & PDF downloads trigger, data persists after reload, month selector present.",
+  "tested_scope": ["frontend", "integration"],
+  "passed": [
+    "Header shows 'Mis Finanzas' with DOP (RD$) as default",
+    "All 5 tabs (Panel/Movimientos/Categorias/Metas/Ajustes) clickable",
+    "Created 2 custom categories (Supermercado, Gasolina) with limit + color, cards render",
+    "Income added via 'Ingreso' dialog (RD$50,000 Salario), shown in transactions-table",
+    "Expense added via 'Gasto' dialog with category select (RD$10,000 Supermercado)",
+    "Dashboard KPIs update in DOP: income=RD$50,000.00, expense=RD$10,000.00, balance=RD$40,000.00, savings=80%",
+    "over-limit-alert banner visible when expense (10k) exceeds limit (5k); progress bar turned red (200% usado, Excedido: RD$5,000.00)",
+    "Goal created in Metas tab (goal-card rendered)",
+    "Currency selector switches to USD; KPIs re-format to $ (no RD$)",
+    "Descargar CSV triggers download: finanzas_2026-08.csv",
+    "Generar PDF triggers download: finanzas_2026-08.pdf",
+    "Data persists after page reload (2 categories still present)",
+    "Month selector present in header"
+  ],
+  "failed": [],
+  "action_items": [],
+  "success_rate": {"backend": "not tested (skipped per request)", "frontend": "100%"},
+  "retest_needed": false,
+  "full_testing_deferred": true,
+  "notes": "Pure client-side app using localStorage under key finance_tracker_data_v1. No backend calls exercised. Charts (Gastos vs Limite bar chart, Distribucion pie chart) not explicitly asserted by selector but Dashboard rendered without errors after data insertion; over-limit alert (which sits above charts) rendered fine."
+}

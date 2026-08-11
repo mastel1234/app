@@ -1,0 +1,24 @@
+{
+  "summary": "Frontend-only latency-sensitive test focused on the newly added PWA + Floating Action Button (FAB) features on top of iteration_1 baseline. Verified PWA assets, mobile viewport usability, FAB quick-add expense (with Disponible antes/después preview + success toast), FAB quick-add income, Categorias available box deduction, Dashboard KPI updates, and FAB visibility on both mobile (390x844) and desktop (1280x800).",
+  "tested_scope": ["frontend", "integration"],
+  "passed": [
+    "manifest.json served at /manifest.json returns 200 with name 'Mis Finanzas - Control de Gastos'",
+    "/sw.js returns 200",
+    "/icon-192.png and /icon-512.png return 200",
+    "Mobile viewport 390x844: header 'Mis Finanzas' + tabs + FAB visible",
+    "FAB toggle opens menu exposing fab-expense-btn and fab-income-btn",
+    "Category 'Alimentación' with limit 5000 created via Categorias tab",
+    "FAB quick-add expense: amount 1200 + category select works; fab-remaining-hint shows 'Disponible antes: RD$5,000.00' and 'Disponible después: RD$3,800.00'",
+    "Success toast after saving expense: 'Gasto registrado. Disponible en \"Alimentación\": RD$3,800.00'",
+    "Categorias page available-{id} box shows 'Disponible RD$3,800.00 24% del límite usado' after expense",
+    "FAB quick-add income: 30,000 Salario updates Dashboard kpi-income to RD$30,000.00",
+    "Dashboard KPI after transactions: income=RD$30,000.00, expense=RD$1,200.00, balance=RD$28,800.00, ahorro=96%",
+    "FAB (fab-toggle) also visible on desktop viewport 1280x800"
+  ],
+  "failed": [],
+  "action_items": [],
+  "success_rate": {"backend": "not tested (skipped per request)", "frontend": "100%"},
+  "retest_needed": false,
+  "full_testing_deferred": true,
+  "notes": "PWA assets confirmed via curl (200 OK). Deeper checks not exercised in this iteration but already covered in iteration_1: over-limit alert, goals progress, currency switch to USD, CSV/PDF export, localStorage persistence, month selector. Pure client-side app; no backend endpoints touched."
+}
