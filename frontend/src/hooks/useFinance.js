@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useState } from 'react';
+import { supabase } from '../lib/supabase';
 import { loadData, saveData } from '../lib/storage';
 
 function uid() {
@@ -18,6 +19,50 @@ export function useFinance() {
   const [data, setData] = useState(() => loadData());
   const [selectedMonth, setSelectedMonth] = useState(currentMonth());
 
+  // 1. Cargar datos iniciales desde Supabase y escuchar cambios en tiempo real
+  useEffect(() => {
+    const fetchCloudTransactions = async () => {
+      const { data: cloudTx, error } = await supabase
+        .from('transactions')
+        .select('*');
+
+      if (!error && cloudTx) {
+        const cloudIncomes = cloudTx
+          .filter((t) => t.type === 'income')
+          .map((t) => ({ id: t.id, amount: Number(t.amount), source: t.source, date: t.date, note: t.note }));
+
+        const cloudExpenses = cloudTx
+          .filter((t) => t.type === 'expense')
+          .map((t) => ({ id: t.id, amount: Number(t.amount), categoryId: t.category_id, date: t.date, note: t.note }));
+
+        setData((prev) => ({
+          ...prev,
+          incomes: cloudIncomes,
+          expenses: cloudExpenses,
+        }));
+      }
+    };
+
+    fetchCloudTransactions();
+
+    // Suscripción en tiempo real (Sincronización instantánea entre celulares)
+    const channel = supabase
+      .channel('schema-db-changes')
+      .on(
+        'postgres_changes',
+        { event: '*', schema: 'public', table: 'transactions' },
+        () => {
+          fetchCloudTransactions();
+        }
+      )
+      .subscribe();
+
+    return () => {
+      supabase.removeChannel(channel);
+    };
+  }, []);
+
+  // Guardar resto de configuración en LocalStorage (categorías, metas, etc.)
   useEffect(() => {
     saveData(data);
   }, [data]);
@@ -44,25 +89,62 @@ export function useFinance() {
     setData((d) => ({
       ...d,
       categories: d.categories.filter((c) => c.id !== id),
-      expenses: d.expenses.filter((e) => e.categoryId !== id),
       frequents: (d.frequents || []).filter((f) => f.categoryId !== id),
       recurring: (d.recurring || []).filter((r) => !(r.kind === 'expense' && r.categoryId === id)),
     }));
   }, []);
 
-  const addExpense = useCallback((exp) => {
-    setData((d) => ({ ...d, expenses: [...d.expenses, { id: uid(), ...exp }] }));
+  // Agregar Gasto a Supabase
+  const addExpense = useCallback(async (exp) => {
+    const { data: newRow, error } = await supabase.from('transactions').insert([
+      {
+        type: 'expense',
+        amount: exp.amount,
+        category_id: exp.categoryId,
+        date: exp.date,
+        note: exp.note,
+      },
+    ]).select();
+
+    if (!error && newRow && newRow[0]) {
+      const inserted = newRow[0];
+      setData((d) => ({
+        ...d,
+        expenses: [...d.expenses, { id: inserted.id, amount: Number(inserted.amount), categoryId: inserted.category_id, date: inserted.date, note: inserted.note }],
+      }));
+    }
   }, []);
 
-  const deleteExpense = useCallback((id) => {
+  // Eliminar Gasto de Supabase
+  const deleteExpense = useCallback(async (id) => {
+    await supabase.from('transactions').delete().eq('id', id);
     setData((d) => ({ ...d, expenses: d.expenses.filter((e) => e.id !== id) }));
   }, []);
 
-  const addIncome = useCallback((inc) => {
-    setData((d) => ({ ...d, incomes: [...d.incomes, { id: uid(), ...inc }] }));
+  // Agregar Ingreso a Supabase
+  const addIncome = useCallback(async (inc) => {
+    const { data: newRow, error } = await supabase.from('transactions').insert([
+      {
+        type: 'income',
+        amount: inc.amount,
+        source: inc.source,
+        date: inc.date,
+        note: inc.note,
+      },
+    ]).select();
+
+    if (!error && newRow && newRow[0]) {
+      const inserted = newRow[0];
+      setData((d) => ({
+        ...d,
+        incomes: [...d.incomes, { id: inserted.id, amount: Number(inserted.amount), source: inserted.source, date: inserted.date, note: inserted.note }],
+      }));
+    }
   }, []);
 
-  const deleteIncome = useCallback((id) => {
+  // Eliminar Ingreso de Supabase
+  const deleteIncome = useCallback(async (id) => {
+    await supabase.from('transactions').delete().eq('id', id);
     setData((d) => ({ ...d, incomes: d.incomes.filter((i) => i.id !== id) }));
   }, []);
 
@@ -85,7 +167,8 @@ export function useFinance() {
     });
   }, []);
 
-  const resetAll = useCallback(() => {
+  const resetAll = useCallback(async () => {
+    await supabase.from('transactions').delete().neq('id', '00000000-0000-0000-0000-000000000000');
     setData({ currency: data.currency, incomes: [], expenses: [], categories: [], goals: [], frequents: [], recurring: [], notificationsEnabled: false, notifiedThresholds: {}, autoSaveEnabled: false, autoSaveGoalId: null, autoSavedMonths: {} });
   }, [data.currency]);
 
@@ -105,14 +188,8 @@ export function useFinance() {
 
   const applyFrequent = useCallback((freq) => {
     const today = new Date().toISOString().slice(0, 10);
-    setData((d) => ({
-      ...d,
-      expenses: [
-        ...d.expenses,
-        { id: uid(), amount: Number(freq.amount), categoryId: freq.categoryId, date: today, note: freq.note || freq.name },
-      ],
-    }));
-  }, []);
+    addExpense({ amount: Number(freq.amount), categoryId: freq.categoryId, date: today, note: freq.note || freq.name });
+  }, [addExpense]);
 
   const setNotificationsEnabled = useCallback((enabled) => {
     setData((d) => ({ ...d, notificationsEnabled: enabled }));
@@ -154,7 +231,6 @@ export function useFinance() {
     const today = now.getDate();
     const daysInMonth = new Date(now.getFullYear(), now.getMonth() + 1, 0).getDate();
 
-    // Pure calculation first (no side effects), so we can return count synchronously
     const list = data.recurring || [];
     const eligible = list.filter((r) => {
       if (!r.active) return false;
@@ -166,8 +242,6 @@ export function useFinance() {
 
     if (eligible.length === 0) return 0;
 
-    const newIncomes = [];
-    const newExpenses = [];
     const eligibleIds = new Set(eligible.map((r) => r.id));
 
     eligible.forEach((r) => {
@@ -175,21 +249,19 @@ export function useFinance() {
       const date = `${curMonth}-${String(effectiveDay).padStart(2, '0')}`;
       const note = r.note ? `${r.note} (recurrente)` : 'Recurrente';
       if (r.kind === 'income') {
-        newIncomes.push({ id: uid(), amount: Number(r.amount), source: r.source || r.name, date, note });
+        addIncome({ amount: Number(r.amount), source: r.source || r.name, date, note });
       } else {
-        newExpenses.push({ id: uid(), amount: Number(r.amount), categoryId: r.categoryId, date, note });
+        addExpense({ amount: Number(r.amount), categoryId: r.categoryId, date, note });
       }
     });
 
     setData((d) => ({
       ...d,
-      incomes: [...d.incomes, ...newIncomes],
-      expenses: [...d.expenses, ...newExpenses],
       recurring: (d.recurring || []).map((r) => (eligibleIds.has(r.id) ? { ...r, lastAppliedMonth: curMonth } : r)),
     }));
 
     return eligible.length;
-  }, [data.recurring]);
+  }, [data.recurring, addIncome, addExpense]);
 
   const setAutoSaveEnabled = useCallback((v) => {
     setData((d) => ({ ...d, autoSaveEnabled: !!v }));
@@ -207,12 +279,10 @@ export function useFinance() {
     const now = new Date();
     const curMonth = `${now.getFullYear()}-${String(now.getMonth() + 1).padStart(2, '0')}`;
 
-    // Collect all months with any activity
     const monthsSet = new Set();
     data.incomes.forEach((i) => { const m = monthKey(i.date); if (m) monthsSet.add(m); });
     data.expenses.forEach((e) => { const m = monthKey(e.date); if (m) monthsSet.add(m); });
 
-    // Filter to CLOSED months (strictly before current calendar month)
     const closedMonths = Array.from(monthsSet)
       .filter((m) => m < curMonth)
       .sort();
@@ -221,7 +291,7 @@ export function useFinance() {
     const applied = [];
 
     closedMonths.forEach((m) => {
-      if (already[m]) return; // already processed
+      if (already[m]) return;
       const totalIn = data.incomes.filter((i) => monthKey(i.date) === m).reduce((s, i) => s + Number(i.amount), 0);
       const totalOut = data.expenses.filter((e) => monthKey(e.date) === m).reduce((s, e) => s + Number(e.amount), 0);
       const leftover = totalIn - totalOut;
@@ -278,7 +348,7 @@ export function useFinance() {
 
   const previousMonth = useMemo(() => {
     const [y, m] = selectedMonth.split('-').map(Number);
-    const d = new Date(y, m - 2, 1); // m is 1-indexed; -2 gives previous month
+    const d = new Date(y, m - 2, 1);
     return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}`;
   }, [selectedMonth]);
 
