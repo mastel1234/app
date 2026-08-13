@@ -16,7 +16,14 @@ export function currentMonth() {
 }
 
 export function useFinance() {
-  const [data, setData] = useState(() => loadData());
+  const [data, setData] = useState(() => {
+    const local = loadData();
+    return {
+      ...local,
+      incomes: local?.incomes || [],
+      expenses: local?.expenses || [],
+    };
+  });
   const [selectedMonth, setSelectedMonth] = useState(currentMonth());
 
   // 1. Cargar datos iniciales desde Supabase y escuchar cambios en tiempo real
@@ -26,7 +33,12 @@ export function useFinance() {
         .from('transactions')
         .select('*');
 
-      if (!error && cloudTx) {
+      if (error) {
+        console.error('Error al obtener datos de Supabase:', error);
+        return;
+      }
+
+      if (cloudTx) {
         const cloudIncomes = cloudTx
           .filter((t) => t.type === 'income')
           .map((t) => ({ id: t.id, amount: Number(t.amount), source: t.source, date: t.date, note: t.note }));
@@ -106,7 +118,12 @@ export function useFinance() {
       },
     ]).select();
 
-    if (!error && newRow && newRow[0]) {
+    if (error) {
+      console.error('Error guardando gasto en Supabase:', error);
+      return;
+    }
+
+    if (newRow && newRow[0]) {
       const inserted = newRow[0];
       setData((d) => ({
         ...d,
@@ -117,7 +134,8 @@ export function useFinance() {
 
   // Eliminar Gasto de Supabase
   const deleteExpense = useCallback(async (id) => {
-    await supabase.from('transactions').delete().eq('id', id);
+    const { error } = await supabase.from('transactions').delete().eq('id', id);
+    if (error) console.error('Error eliminando gasto de Supabase:', error);
     setData((d) => ({ ...d, expenses: d.expenses.filter((e) => e.id !== id) }));
   }, []);
 
@@ -133,7 +151,12 @@ export function useFinance() {
       },
     ]).select();
 
-    if (!error && newRow && newRow[0]) {
+    if (error) {
+      console.error('Error guardando ingreso en Supabase:', error);
+      return;
+    }
+
+    if (newRow && newRow[0]) {
       const inserted = newRow[0];
       setData((d) => ({
         ...d,
@@ -144,7 +167,8 @@ export function useFinance() {
 
   // Eliminar Ingreso de Supabase
   const deleteIncome = useCallback(async (id) => {
-    await supabase.from('transactions').delete().eq('id', id);
+    const { error } = await supabase.from('transactions').delete().eq('id', id);
+    if (error) console.error('Error eliminando ingreso de Supabase:', error);
     setData((d) => ({ ...d, incomes: d.incomes.filter((i) => i.id !== id) }));
   }, []);
 
