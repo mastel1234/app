@@ -28,21 +28,22 @@ export function useFinance() {
 
   const [selectedMonth, setSelectedMonth] = useState(currentMonth());
 
-  // 1. Carga inicial de TODOS los datos desde Supabase y sincronización en tiempo real
+  // Carga total de datos desde la nube
   const fetchAllCloudData = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
-    // Obtener transacciones, categorías y metas asociadas al usuario logueado
-    const [txRes, catRes, goalRes] = await Promise.all([
+    const [txRes, catRes, goalRes, settingsRes] = await Promise.all([
       supabase.from('transactions').select('*').eq('user_id', user.id),
       supabase.from('categories').select('*').eq('user_id', user.id),
       supabase.from('goals').select('*').eq('user_id', user.id),
+      supabase.from('user_settings').select('*').eq('user_id', user.id).maybeSingle(),
     ]);
 
     const cloudTx = txRes.data || [];
     const cloudCat = catRes.data || [];
     const cloudGoals = goalRes.data || [];
+    const cloudSettings = settingsRes.data;
 
     const cloudIncomes = cloudTx
       .filter((t) => t.type === 'income')
@@ -57,7 +58,6 @@ export function useFinance() {
       name: c.name,
       monthlyLimit: Number(c.budget || c.monthlyLimit || 0),
       color: c.color || '#4B8B6B',
-      icon: c.icon,
     }));
 
     const mappedGoals = cloudGoals.map((g) => ({
@@ -69,6 +69,8 @@ export function useFinance() {
 
     setData((prev) => ({
       ...prev,
+      currency: cloudSettings?.currency || 'DOP',
+      notificationsEnabled: cloudSettings?.notifications_enabled || false,
       incomes: cloudIncomes,
       expenses: cloudExpenses,
       categories: mappedCategories,
@@ -79,19 +81,18 @@ export function useFinance() {
   useEffect(() => {
     fetchAllCloudData();
 
-    // Canales de suscripción en tiempo real para reflejar cambios instantáneos en ambos celulares
     const channelTx = supabase
-      .channel('realtime-transactions')
+      .channel('rt-transactions')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'transactions' }, fetchAllCloudData)
       .subscribe();
 
     const channelCat = supabase
-      .channel('realtime-categories')
+      .channel('rt-categories')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'categories' }, fetchAllCloudData)
       .subscribe();
 
     const channelGoals = supabase
-      .channel('realtime-goals')
+      .channel('rt-goals')
       .on('postgres_changes', { event: '*', schema: 'public', table: 'goals' }, fetchAllCloudData)
       .subscribe();
 
@@ -102,20 +103,27 @@ export function useFinance() {
     };
   }, [fetchAllCloudData]);
 
-  // --- CATEGORÍAS (Sincronizadas con Supabase) ---
+  // Guardar Moneda en Supabase
+  const setCurrency = useCallback(async (currency) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    await supabase.from('user_settings').upsert({
+      user_id: user.id,
+      currency: currency,
+    });
+
+    setData((d) => ({ ...d, currency }));
+  }, []);
+
+  // Categorías
   const addCategory = useCallback(async (cat) => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
     const { error } = await supabase.from('categories').insert([
-      {
-        user_id: user.id,
-        name: cat.name,
-        budget: cat.monthlyLimit || 0,
-        color: cat.color || '#4B8B6B',
-      },
+      { user_id: user.id, name: cat.name, budget: cat.monthlyLimit || 0, color: cat.color || '#4B8B6B' },
     ]);
-
     if (!error) fetchAllCloudData();
   }, [fetchAllCloudData]);
 
@@ -134,22 +142,14 @@ export function useFinance() {
     if (!error) fetchAllCloudData();
   }, [fetchAllCloudData]);
 
-  // --- MOVIMIENTOS (Gastos e Ingresos) ---
+  // Transacciones
   const addExpense = useCallback(async (exp) => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
     const { error } = await supabase.from('transactions').insert([
-      {
-        user_id: user.id,
-        type: 'expense',
-        amount: exp.amount,
-        category_id: exp.categoryId,
-        date: exp.date,
-        note: exp.note,
-      },
+      { user_id: user.id, type: 'expense', amount: exp.amount, category_id: exp.categoryId, date: exp.date, note: exp.note },
     ]);
-
     if (!error) fetchAllCloudData();
   }, [fetchAllCloudData]);
 
@@ -163,16 +163,8 @@ export function useFinance() {
     if (!user) return;
 
     const { error } = await supabase.from('transactions').insert([
-      {
-        user_id: user.id,
-        type: 'income',
-        amount: inc.amount,
-        source: inc.source,
-        date: inc.date,
-        note: inc.note,
-      },
+      { user_id: user.id, type: 'income', amount: inc.amount, source: inc.source, date: inc.date, note: inc.note },
     ]);
-
     if (!error) fetchAllCloudData();
   }, [fetchAllCloudData]);
 
@@ -181,20 +173,14 @@ export function useFinance() {
     if (!error) fetchAllCloudData();
   }, [fetchAllCloudData]);
 
-  // --- METAS DE AHORRO (Sincronizadas con Supabase) ---
+  // Metas
   const addGoal = useCallback(async (goal) => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
 
     const { error } = await supabase.from('goals').insert([
-      {
-        user_id: user.id,
-        title: goal.name,
-        target_amount: goal.targetAmount,
-        current_amount: goal.currentAmount || 0,
-      },
+      { user_id: user.id, title: goal.name, target_amount: goal.targetAmount, current_amount: goal.currentAmount || 0 },
     ]);
-
     if (!error) fetchAllCloudData();
   }, [fetchAllCloudData]);
 
@@ -213,11 +199,6 @@ export function useFinance() {
     if (!error) fetchAllCloudData();
   }, [fetchAllCloudData]);
 
-  // --- AJUSTES Y HERRAMIENTAS MANTENIDAS ---
-  const setCurrency = useCallback((currency) => {
-    setData((d) => ({ ...d, currency }));
-  }, []);
-
   const resetAll = useCallback(async () => {
     const { data: { user } } = await supabase.auth.getUser();
     if (!user) return;
@@ -226,39 +207,31 @@ export function useFinance() {
       supabase.from('transactions').delete().eq('user_id', user.id),
       supabase.from('categories').delete().eq('user_id', user.id),
       supabase.from('goals').delete().eq('user_id', user.id),
+      supabase.from('user_settings').delete().eq('user_id', user.id),
     ]);
 
     fetchAllCloudData();
   }, [fetchAllCloudData]);
 
-  const setNotificationsEnabled = useCallback((enabled) => {
+  const setNotificationsEnabled = useCallback(async (enabled) => {
+    const { data: { user } } = await supabase.auth.getUser();
+    if (!user) return;
+
+    await supabase.from('user_settings').upsert({
+      user_id: user.id,
+      notifications_enabled: enabled,
+    });
+
     setData((d) => ({ ...d, notificationsEnabled: enabled }));
   }, []);
 
-  const markThresholdNotified = useCallback((month, categoryId, threshold) => {
-    setData((d) => {
-      const key = `${month}_${categoryId}`;
-      const current = (d.notifiedThresholds && d.notifiedThresholds[key]) || [];
-      if (current.includes(threshold)) return d;
-      return {
-        ...d,
-        notifiedThresholds: { ...(d.notifiedThresholds || {}), [key]: [...current, threshold] },
-      };
-    });
-  }, []);
-
-  const setAutoSaveEnabled = useCallback((v) => {
-    setData((d) => ({ ...d, autoSaveEnabled: !!v }));
-  }, []);
-
-  const setAutoSaveGoal = useCallback((goalId) => {
-    setData((d) => ({ ...d, autoSaveGoalId: goalId || null }));
-  }, []);
-
+  const markThresholdNotified = useCallback(() => {}, []);
+  const setAutoSaveEnabled = useCallback(() => {}, []);
+  const setAutoSaveGoal = useCallback(() => {}, []);
   const applyPendingRecurring = useCallback(() => 0, []);
   const applyPendingAutoSave = useCallback(() => [], []);
 
-  // --- CÁLCULOS MENSUALES Y PROYECCIONES ---
+  // Cálculos mensuales
   const monthly = useMemo(() => {
     const incomes = data.incomes.filter((i) => monthKey(i.date) === selectedMonth);
     const expenses = data.expenses.filter((e) => monthKey(e.date) === selectedMonth);
