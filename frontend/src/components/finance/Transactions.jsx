@@ -1,6 +1,6 @@
-import { useState } from 'react';
+import { useState, useEffect } from 'react';
 import { toast } from 'sonner';
-import { Plus, Trash2, ArrowUpCircle, ArrowDownCircle } from 'lucide-react';
+import { Plus, Trash2, ArrowUpCircle, ArrowDownCircle, Pencil } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter, DialogTrigger, DialogDescription } from '@/components/ui/dialog';
@@ -121,9 +121,138 @@ function AddTransactionDialog({ finance, type, onOpenChange, open }) {
   );
 }
 
+function EditTransactionDialog({ finance, transaction, open, onOpenChange }) {
+  const isExpense = transaction?.kind === 'expense';
+  const [amount, setAmount] = useState('');
+  const [date, setDate] = useState(todayStr());
+  const [categoryId, setCategoryId] = useState('');
+  const [source, setSource] = useState('');
+  const [note, setNote] = useState('');
+
+  useEffect(() => {
+    if (transaction) {
+      setAmount(transaction.amount ? transaction.amount.toString() : '');
+      setDate(transaction.date || todayStr());
+      setCategoryId(transaction.raw?.categoryId || '');
+      setSource(transaction.raw?.source || '');
+      setNote(transaction.note || '');
+    }
+  }, [transaction]);
+
+  if (!transaction) return null;
+
+  const submit = () => {
+    const amt = parseFloat(amount);
+    if (!amt || amt <= 0) {
+      toast.error('Ingresa un monto válido');
+      return;
+    }
+
+    const rawId = transaction.raw.id;
+
+    if (isExpense) {
+      if (!categoryId) {
+        toast.error('Selecciona una categoría');
+        return;
+      }
+      const data = { amount: amt, categoryId, date, note };
+      if (typeof finance.updateExpense === 'function') {
+        finance.updateExpense(rawId, data);
+      } else if (typeof finance.editExpense === 'function') {
+        finance.editExpense(rawId, data);
+      } else {
+        finance.deleteExpense(rawId);
+        finance.addExpense(data);
+      }
+      toast.success('Gasto actualizado');
+    } else {
+      const data = { amount: amt, source: source || 'Ingreso', date, note };
+      if (typeof finance.updateIncome === 'function') {
+        finance.updateIncome(rawId, data);
+      } else if (typeof finance.editIncome === 'function') {
+        finance.editIncome(rawId, data);
+      } else {
+        finance.deleteIncome(rawId);
+        finance.addIncome(data);
+      }
+      toast.success('Ingreso actualizado');
+    }
+
+    onOpenChange(false);
+  };
+
+  return (
+    <Dialog open={open} onOpenChange={onOpenChange}>
+      <DialogContent data-testid="edit-transaction-dialog">
+        <DialogHeader>
+          <DialogTitle>{isExpense ? 'Editar Gasto' : 'Editar Ingreso'}</DialogTitle>
+          <DialogDescription>
+            Modifica los detalles de este movimiento.
+          </DialogDescription>
+        </DialogHeader>
+        <div className="space-y-4">
+          <div>
+            <Label htmlFor="edit-tx-amount">Monto ({finance.data.currency})</Label>
+            <Input
+              id="edit-tx-amount"
+              type="number"
+              step="0.01"
+              value={amount}
+              onChange={(e) => setAmount(e.target.value)}
+              placeholder="0.00"
+              data-testid="edit-amount-input"
+            />
+          </div>
+          {isExpense ? (
+            <div>
+              <Label>Categoría</Label>
+              <Select value={categoryId} onValueChange={setCategoryId}>
+                <SelectTrigger data-testid="edit-expense-category-select"><SelectValue placeholder="Selecciona una categoría" /></SelectTrigger>
+                <SelectContent>
+                  {finance.data.categories.length === 0 && (
+                    <div className="px-3 py-2 text-sm text-muted-foreground">Crea una categoría primero</div>
+                  )}
+                  {finance.data.categories.map((c) => (
+                    <SelectItem key={c.id} value={c.id}>{c.name}</SelectItem>
+                  ))}
+                </SelectContent>
+              </Select>
+            </div>
+          ) : (
+            <div>
+              <Label htmlFor="edit-income-source">Fuente</Label>
+              <Input
+                id="edit-income-source"
+                value={source}
+                onChange={(e) => setSource(e.target.value)}
+                placeholder="Ej: Salario, Freelance…"
+                data-testid="edit-income-source-input"
+              />
+            </div>
+          )}
+          <div>
+            <Label htmlFor="edit-tx-date">Fecha</Label>
+            <Input id="edit-tx-date" type="date" value={date} onChange={(e) => setDate(e.target.value)} data-testid="edit-date-input" />
+          </div>
+          <div>
+            <Label htmlFor="edit-tx-note">Nota (opcional)</Label>
+            <Textarea id="edit-tx-note" value={note} onChange={(e) => setNote(e.target.value)} rows={2} data-testid="edit-note-input" />
+          </div>
+        </div>
+        <DialogFooter>
+          <Button variant="outline" onClick={() => onOpenChange(false)}>Cancelar</Button>
+          <Button onClick={submit} data-testid="edit-submit-btn">Guardar cambios</Button>
+        </DialogFooter>
+      </DialogContent>
+    </Dialog>
+  );
+}
+
 export default function Transactions({ finance }) {
   const [expenseOpen, setExpenseOpen] = useState(false);
   const [incomeOpen, setIncomeOpen] = useState(false);
+  const [editingTx, setEditingTx] = useState(null);
+  const [editOpen, setEditOpen] = useState(false);
   const [filter, setFilter] = useState('all');
 
   const catMap = Object.fromEntries(finance.data.categories.map((c) => [c.id, c]));
@@ -152,6 +281,11 @@ export default function Transactions({ finance }) {
   ]
     .filter((r) => filter === 'all' || r.kind === filter)
     .sort((a, b) => b.date.localeCompare(a.date));
+
+  const handleEdit = (row) => {
+    setEditingTx(row);
+    setEditOpen(true);
+  };
 
   return (
     <div className="space-y-6">
@@ -203,7 +337,7 @@ export default function Transactions({ finance }) {
                   <TableHead>Categoría / Fuente</TableHead>
                   <TableHead>Nota</TableHead>
                   <TableHead className="text-right">Monto</TableHead>
-                  <TableHead className="w-10"></TableHead>
+                  <TableHead className="w-20 text-right"></TableHead>
                 </TableRow>
               </TableHeader>
               <TableBody>
@@ -232,18 +366,28 @@ export default function Transactions({ finance }) {
                       {r.kind === 'income' ? '+' : '−'} {formatMoney(r.amount, currency)}
                     </TableCell>
                     <TableCell>
-                      <Button
-                        variant="ghost"
-                        size="icon"
-                        onClick={() => {
-                          if (r.kind === 'income') finance.deleteIncome(r.raw.id);
-                          else finance.deleteExpense(r.raw.id);
-                          toast.success('Movimiento eliminado');
-                        }}
-                        data-testid={`delete-tx-${r.raw.id}`}
-                      >
-                        <Trash2 className="w-4 h-4 text-muted-foreground hover:text-destructive" />
-                      </Button>
+                      <div className="flex items-center justify-end gap-1">
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => handleEdit(r)}
+                          data-testid={`edit-tx-${r.raw.id}`}
+                        >
+                          <Pencil className="w-4 h-4 text-muted-foreground hover:text-foreground" />
+                        </Button>
+                        <Button
+                          variant="ghost"
+                          size="icon"
+                          onClick={() => {
+                            if (r.kind === 'income') finance.deleteIncome(r.raw.id);
+                            else finance.deleteExpense(r.raw.id);
+                            toast.success('Movimiento eliminado');
+                          }}
+                          data-testid={`delete-tx-${r.raw.id}`}
+                        >
+                          <Trash2 className="w-4 h-4 text-muted-foreground hover:text-destructive" />
+                        </Button>
+                      </div>
                     </TableCell>
                   </TableRow>
                 ))}
@@ -255,6 +399,7 @@ export default function Transactions({ finance }) {
 
       <AddTransactionDialog finance={finance} type="expense" open={expenseOpen} onOpenChange={setExpenseOpen} />
       <AddTransactionDialog finance={finance} type="income" open={incomeOpen} onOpenChange={setIncomeOpen} />
+      <EditTransactionDialog finance={finance} transaction={editingTx} open={editOpen} onOpenChange={setEditOpen} />
     </div>
   );
 }
