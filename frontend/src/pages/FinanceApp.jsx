@@ -27,7 +27,6 @@ export default function FinanceApp() {
     didRunRecurring.current = true;
     const count = finance.applyPendingRecurring();
     if (count > 0) {
-      // Defer toast to next tick so Sonner Toaster is fully subscribed
       setTimeout(() => {
         toast.success(`Se aplicaron ${count} transacción(es) recurrente(s) de este mes.`);
       }, 0);
@@ -121,7 +120,7 @@ export default function FinanceApp() {
       </main>
 
       <footer className="max-w-7xl mx-auto px-4 sm:px-6 lg:px-8 py-6 pb-40 sm:pb-6 text-center text-xs text-muted-foreground">
-        Datos guardados de forma local en tu dispositivo · No se comparten con nadie
+        Sincronizado en tiempo real con la nube · Mis Finanzas
       </footer>
 
       <QuickAddFAB finance={finance} />
