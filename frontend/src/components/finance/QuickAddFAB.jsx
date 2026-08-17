@@ -17,6 +17,7 @@ export default function QuickAddFAB({ finance }) {
   const [dialogType, setDialogType] = useState(null); // 'expense' | 'income' | 'frequent'
   const [visible, setVisible] = useState(true);
   const [amount, setAmount] = useState('');
+  const [date, setDate] = useState(todayStr());
   const [categoryId, setCategoryId] = useState('');
   const [source, setSource] = useState('');
   const [note, setNote] = useState('');
@@ -53,6 +54,7 @@ export default function QuickAddFAB({ finance }) {
     setDialogType(type);
     setMenuOpen(false);
     setAmount('');
+    setDate(todayStr());
     setCategoryId('');
     setSource('');
     setNote('');
@@ -80,7 +82,10 @@ export default function QuickAddFAB({ finance }) {
       toast.error('Ingresa un monto válido');
       return;
     }
-    const date = todayStr();
+    if (!date) {
+      toast.error('Selecciona una fecha válida');
+      return;
+    }
     if (dialogType === 'expense') {
       if (!categoryId) {
         toast.error('Selecciona una categoría');
@@ -275,6 +280,16 @@ export default function QuickAddFAB({ finance }) {
                 />
               </div>
             )}
+            <div>
+              <Label htmlFor="fab-date">Fecha del movimiento</Label>
+              <Input
+                id="fab-date"
+                type="date"
+                value={date}
+                onChange={(e) => setDate(e.target.value)}
+                data-testid="fab-date-input"
+              />
+            </div>
             <div>
               <Label htmlFor="fab-note">Nota (opcional)</Label>
               <Input id="fab-note" value={note} onChange={(e) => setNote(e.target.value)} placeholder="Describe brevemente…" data-testid="fab-note-input" />
