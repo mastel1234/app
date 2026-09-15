@@ -51,7 +51,14 @@ export function useFinance() {
 
     const cloudExpenses = cloudTx
       .filter((t) => t.type === 'expense')
-      .map((t) => ({ id: t.id, amount: Number(t.amount), categoryId: t.category_id, date: t.date, note: t.note }));
+      .map((t) => ({ 
+        id: t.id, 
+        amount: Number(t.amount), 
+        categoryId: t.category_id, 
+        categoryName: t.category || t.category_name, 
+        date: t.date, 
+        note: t.note 
+      }));
 
     const mappedCategories = cloudCat.map((c) => ({
       id: c.id,
@@ -231,7 +238,7 @@ export function useFinance() {
   const applyPendingRecurring = useCallback(() => 0, []);
   const applyPendingAutoSave = useCallback(() => [], []);
 
-  // Cálculos mensuales
+  // Cálculos mensuales actualizados con coincidencia flexible por ID o Nombre
   const monthly = useMemo(() => {
     const incomes = data.incomes.filter((i) => monthKey(i.date) === selectedMonth);
     const expenses = data.expenses.filter((e) => monthKey(e.date) === selectedMonth);
@@ -240,7 +247,12 @@ export function useFinance() {
     const balance = totalIncome - totalExpense;
 
     const byCategory = data.categories.map((cat) => {
-      const spent = expenses.filter((e) => e.categoryId === cat.id).reduce((s, e) => s + Number(e.amount), 0);
+      const spent = expenses.filter((e) => 
+        e.categoryId === cat.id || 
+        String(e.categoryId) === String(cat.id) ||
+        (e.categoryName && e.categoryName.toLowerCase() === cat.name.toLowerCase())
+      ).reduce((s, e) => s + Number(e.amount), 0);
+
       const pct = cat.monthlyLimit > 0 ? (spent / cat.monthlyLimit) * 100 : 0;
       return { ...cat, spent, percent: pct, over: cat.monthlyLimit > 0 && spent > cat.monthlyLimit };
     });
@@ -263,7 +275,11 @@ export function useFinance() {
     const totalExpense = expenses.reduce((s, e) => s + Number(e.amount), 0);
     const balance = totalIncome - totalExpense;
     const byCategory = data.categories.map((cat) => {
-      const spent = expenses.filter((e) => e.categoryId === cat.id).reduce((s, e) => s + Number(e.amount), 0);
+      const spent = expenses.filter((e) => 
+        e.categoryId === cat.id || 
+        String(e.categoryId) === String(cat.id) ||
+        (e.categoryName && e.categoryName.toLowerCase() === cat.name.toLowerCase())
+      ).reduce((s, e) => s + Number(e.amount), 0);
       return { ...cat, spent };
     });
     return { month: previousMonth, incomes, expenses, totalIncome, totalExpense, balance, byCategory };
